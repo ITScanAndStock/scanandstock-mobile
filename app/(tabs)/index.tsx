@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Link } from 'expo-router';
 
 // import svg and icons
+import Badge from '@/assets/images/badge.svg';
 import ScanLine from '@/assets/images/scan-line.svg';
 import AntDesign from '@expo/vector-icons/AntDesign';
 
@@ -26,7 +27,7 @@ export default function Scan() {
 
 	return (
 		<View style={styles.container}>
-			{/* <Badge style={styles.svg} /> */}
+			<Badge style={styles.svg} />
 			<ChoosAccount />
 			<ScanBadge />
 			<Link
