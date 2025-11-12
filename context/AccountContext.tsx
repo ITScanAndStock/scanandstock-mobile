@@ -7,6 +7,8 @@ interface AccountContextType {
 	activeAccount: Account | null;
 	setActiveAccount: (account: Account) => Promise<void>;
 	isLoading: boolean;
+	isTracingEnabled: boolean | undefined;
+	resetAccount: () => Promise<void>;
 }
 
 const AccountContext = createContext<AccountContextType | undefined>(undefined);
@@ -14,6 +16,7 @@ const AccountContext = createContext<AccountContextType | undefined>(undefined);
 export function AccountProvider({ children }: { children: React.ReactNode }) {
 	const [accounts, setAccounts] = useState<Account[]>([]);
 	const [activeAccount, setActiveAccountState] = useState<Account | null>(null);
+	const [isTracingEnabled, setIsTracingEnabled] = useState<boolean>(true);
 	const [isLoading, setIsLoading] = useState(true);
 
 	useEffect(() => {
@@ -25,6 +28,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 			setIsLoading(true);
 			const accountsString = await AsyncStorage.getItem('account');
 			const activeAccountString = await AsyncStorage.getItem('activated_compte');
+			const tracingEnabled = await AsyncStorage.getItem('tracingEnabled');
 
 			if (accountsString) {
 				const parsedAccounts = JSON.parse(accountsString);
@@ -35,11 +39,23 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 				const parsedActiveAccount = JSON.parse(activeAccountString);
 				setActiveAccountState(parsedActiveAccount);
 			}
+
+			if (tracingEnabled) {
+				const parsedTracingEnabled = JSON.parse(tracingEnabled);
+				setIsTracingEnabled(parsedTracingEnabled);
+			}
 		} catch (error) {
 			console.error('Erreur chargement comptes:', error);
 		} finally {
 			setIsLoading(false);
 		}
+	};
+
+	const resetAccount = async () => {
+		setAccounts([]);
+		setActiveAccountState(null);
+		setIsTracingEnabled(false);
+		setIsTracingEnabled(false);
 	};
 
 	const setActiveAccount = async (account: Account) => {
@@ -51,7 +67,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 		}
 	};
 
-	return <AccountContext.Provider value={{ accounts, activeAccount, setActiveAccount, isLoading }}>{children}</AccountContext.Provider>;
+	return <AccountContext.Provider value={{ accounts, activeAccount, setActiveAccount, isLoading, isTracingEnabled, resetAccount }}>{children}</AccountContext.Provider>;
 }
 
 export function useAccount() {

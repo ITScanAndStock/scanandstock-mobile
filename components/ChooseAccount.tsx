@@ -104,6 +104,7 @@ const styles = StyleSheet.create({
 		top: 1,
 		left: 0,
 		borderBottomRightRadius: 10,
+		zIndex: 3,
 	},
 	mainBtn: {
 		flexDirection: 'row',
@@ -112,6 +113,7 @@ const styles = StyleSheet.create({
 	},
 	dropdownContainer: {
 		backgroundColor: colors.DARK,
+		borderBottomRightRadius: 10,
 	},
 	text: {
 		color: colors.WHITE,

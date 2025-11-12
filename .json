@@ -1,0 +1,20 @@
+{
+	"accounts": [
+		{ "id": 316, "name": "Robin", "structureId": 17 },
+		{ "id": 476, "name": "Douchette", "structureId": 17 },
+		{ "id": 26, "name": "ScanAndStock", "structureId": 17 },
+		{ "id": 154, "name": "Arthur", "structureId": 17 }
+	],
+	"login": {
+		"catalog": "BASE",
+		"country": "FR",
+		"firstConnection": false,
+		"firstName": "Robin",
+		"hasContactInfo": true,
+		"lastConnection": "2025-11-12 15:14:00",
+		"lastName": "Fantino",
+		"licenseType": "PRO",
+		"roles": ["MANAGER_STRUCT", "ORDERER", "STATS_VIEWER", "SUPERVISOR", "ORDER_RECEIVER", "USER"],
+		"tracingEnabled": false
+	}
+}

@@ -1,4 +1,5 @@
 // contexts/AuthContext.tsx
+import UserService from '@/services/UserService';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AuthService from '../services/AuthService';
 
@@ -49,6 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 			if (result) {
 				setIsAuthenticated(true);
+				UserService.stockUserAccounts();
 			}
 		} catch (error) {
 			console.error('❌ Erreur de connexion:', error);

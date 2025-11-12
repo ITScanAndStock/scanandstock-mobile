@@ -17,19 +17,21 @@ import ThemedText from '@/components/ui-components/ThemedText';
 
 // importe constants
 import { colors } from '@/constants/colors';
+import { useAccount } from '@/context/AccountContext';
 
 export default function Scan() {
+	const { isTracingEnabled } = useAccount();
 	const dataTest = [
 		{ designation: 'ADHESIF ABCD VPS 17 ML Avec 10% de mire laine machine', mouvement: 1 },
 		{ designation: 'Airflow', mouvement: 0 },
 		{ designation: 'Airflow', mouvement: 1 },
 	];
-
 	return (
 		<View style={styles.container}>
 			<Badge style={styles.svg} />
 			<ChoosAccount />
-			<ScanBadge />
+			{isTracingEnabled === true ? <ScanBadge /> : null}
+
 			<Link
 				style={styles.btn}
 				href="/scanner"
@@ -88,6 +90,7 @@ export const styles = StyleSheet.create({
 	svg: {
 		width: 160,
 		height: 160,
+		marginBottom: 10,
 	},
 	btn: {
 		width: '100%',
