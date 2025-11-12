@@ -13,8 +13,6 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 // import contants
 import { colors } from '@/constants/colors';
 
-SplashScreen.preventAutoHideAsync();
-
 export default function TabLayout() {
 	// import font familly and wait to it load
 	const [loaded, error] = useFonts({

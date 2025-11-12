@@ -5,45 +5,37 @@ import 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // import expo
-import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 
 // import components
 import Header from '@/components/Header';
+import { AccountProvider } from '@/context/AccountContext';
+import { AuthProvider, useAuth } from '../context/AuthContext';
+import RootNavigator from './RootNavigator';
 
-export default function RootLayout() {
+// Empêcher le splash screen de se cacher automatiquement
+SplashScreen.preventAutoHideAsync();
+
+function RootLayoutContent() {
+	const { isAuthenticated } = useAuth();
+
 	return (
 		<SafeAreaView style={styles.container}>
 			<StatusBar style="light" />
-			<Header />
-			<Stack>
-				<Stack.Screen
-					name="(tabs)"
-					options={{
-						presentation: 'modal',
-						headerShown: false,
-						animationTypeForReplace: 'push',
-						animation: 'slide_from_left',
-					}}
-				/>
-				<Stack.Screen
-					name="scanner"
-					options={{
-						presentation: 'card',
-						headerShown: false,
-						animation: 'slide_from_right',
-					}}
-				/>
-				<Stack.Screen
-					name="login"
-					options={{
-						presentation: 'card',
-						headerShown: false,
-						animation: 'slide_from_right',
-					}}
-				/>
-			</Stack>
+			{isAuthenticated && <Header />}
+			<RootNavigator />
 		</SafeAreaView>
+	);
+}
+
+export default function RootLayout() {
+	return (
+		<AuthProvider>
+			<AccountProvider>
+				<RootLayoutContent />
+			</AccountProvider>
+		</AuthProvider>
 	);
 }
 

@@ -1,46 +1,58 @@
+import ThemedText from '@/components/ui-components/ThemedText';
+import { colors } from '@/constants/colors';
 import React from 'react';
-import { Text, View } from 'react-native';
-// import { useAuth } from '../context/AuthContext';
+import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
+import LogoVertical from '../assets/images/logo-vertical.svg';
+import { useAuth } from '../context/AuthContext';
 
 const LoginScreen = () => {
-	// const { login, isLoading, logout, isAuthenticated } = useAuth();
+	const { login, isLoading } = useAuth();
 
-	// console.log('🔍 LoginScreen - isLoading:', isLoading);
+	const handleLogin = async () => {
+		try {
+			await login();
+		} catch (error) {
+			console.error('❌ Erreur:', error);
+		}
+	};
 
-	// const handleLogin = async () => {
-	// 	console.log('🚀 Bouton cliqué');
-	// 	try {
-	// 		await login();
-	// 	} catch (error) {
-	// 		console.error('❌ Erreur:', error);
-	// 	}
-	// };
-
-	// if (isLoading) {
-	// 	return <ActivityIndicator size="large" />;
-	// }
+	if (isLoading) {
+		return <ActivityIndicator size="large" />;
+	}
 
 	return (
-		<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-			{/* <TouchableOpacity
+		<View style={styles.container}>
+			<LogoVertical />
+
+			<TouchableOpacity
 				onPress={handleLogin}
-				style={{ padding: 20, backgroundColor: '#007AFF', borderRadius: 8 }}
+				activeOpacity={0.8}
+				style={styles.btn}
 			>
-				<Text style={{ color: 'white', fontSize: 16 }}>Se connecter avec Keycloak</Text>
+				<ThemedText
+					variant="textBtn"
+					color="WHITE"
+				>
+					Se connecter
+				</ThemedText>
 			</TouchableOpacity>
-
-			{isAuthenticated ? (
-				<Button
-					title="déconnexion"
-					onPress={logout}
-				/>
-			) : (
-				<Text> pas authentifier </Text>
-			)} */}
-
-			<Text>En attendant</Text>
 		</View>
 	);
 };
 
 export default LoginScreen;
+
+const styles = StyleSheet.create({
+	container: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		backgroundColor: colors.WHITE,
+	},
+	btn: {
+		backgroundColor: colors.DARK,
+		paddingVertical: 10,
+		paddingHorizontal: 20,
+		borderRadius: 20,
+	},
+});

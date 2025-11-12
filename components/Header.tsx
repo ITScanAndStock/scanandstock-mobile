@@ -9,9 +9,12 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 // import constants
 import { colors } from '@/constants/colors';
+import { useAuth } from '../context/AuthContext';
 
 // header of the application
 export default function Header() {
+	const { logout } = useAuth();
+
 	return (
 		<View style={styles.container}>
 			<Link href={'/'}>
@@ -20,7 +23,7 @@ export default function Header() {
 					source={require('../assets/images/logo.png')}
 				/>
 			</Link>
-			<Pressable>
+			<Pressable onPress={logout}>
 				<FontAwesome
 					name="power-off"
 					size={30}
