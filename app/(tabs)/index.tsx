@@ -18,14 +18,27 @@ import ThemedText from '@/components/ui-components/ThemedText';
 // importe constants
 import { colors } from '@/constants/colors';
 import { useAccount } from '@/context/AccountContext';
+import { StatsModel } from '@/model/Stats';
+import ProductService from '@/services/ProductService';
+import { useEffect, useState } from 'react';
 
 export default function Scan() {
-	const { isTracingEnabled } = useAccount();
-	const dataTest = [
-		{ designation: 'ADHESIF ABCD VPS 17 ML Avec 10% de mire laine machine', mouvement: 1 },
-		{ designation: 'Airflow', mouvement: 0 },
-		{ designation: 'Airflow', mouvement: 1 },
-	];
+	const { isTracingEnabled, activeAccount } = useAccount();
+	const [stats, setStats] = useState<StatsModel[]>();
+
+	useEffect(() => {
+		loadStats();
+	}, [activeAccount]);
+
+	const loadStats = async () => {
+		try {
+			const response = await ProductService.getStats();
+			setStats(response);
+		} catch (error) {
+			console.error('❌ Erreur chargement stats:', error);
+		}
+	};
+
 	return (
 		<View style={styles.container}>
 			<Badge style={styles.svg} />
@@ -50,7 +63,7 @@ export default function Scan() {
 					style={styles.backgroundGradient}
 					colors={['#12A19A40', '#12A19A1C']}
 				/>
-				{dataTest.map((data, index) => {
+				{stats?.map((stat, index) => {
 					return (
 						<ThemedText
 							variant="productDesignation"
@@ -58,7 +71,7 @@ export default function Scan() {
 							numberOfLines={1}
 							ellipsizeMode="tail"
 						>
-							{data.mouvement === 1 ? (
+							{stat.type === 'increase' ? (
 								<AntDesign
 									name="arrow-up"
 									size={24}
@@ -71,7 +84,7 @@ export default function Scan() {
 									color="red"
 								/>
 							)}
-							{data.designation}
+							{stat.designation}
 						</ThemedText>
 					);
 				})}

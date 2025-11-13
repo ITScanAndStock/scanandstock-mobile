@@ -2,8 +2,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
-import { keycloakConfig } from '../config/KeycloakConfig';
-import UserService from './UserService';
+import { apiConfig, keycloakConfig } from '../config/KeycloakConfig';
 
 // Nécessaire pour que le navigateur se ferme après l'authentification
 WebBrowser.maybeCompleteAuthSession();
@@ -187,7 +186,50 @@ class AuthService {
   }
 
   async storeUserInfo() {
-    await UserService.stockUserAccounts();
+    try {
+      const token = await AsyncStorage.getItem('token');
+
+      if (!token) {
+        throw new Error('Pas de token disponible');
+      }
+
+      // Utiliser fetch directement pour éviter le cycle
+      const response = await fetch(`${apiConfig.apiUrl}/user/accounts`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('📦 Données utilisateur reçues:', data);
+
+      // Sauvegarder les comptes
+      if (data.accounts && Array.isArray(data.accounts)) {
+        await AsyncStorage.setItem('account', JSON.stringify(data.accounts));
+
+        // Sauvegarder le premier compte comme compte actif
+        if (data.accounts.length > 0) {
+          await AsyncStorage.setItem('activated_compte', JSON.stringify(data.accounts[0]));
+        }
+      }
+
+      // Sauvegarder tracingEnabled
+      const tracingEnabled = data.login?.tracingEnabled ?? data.tracingEnabled ?? false;
+      await AsyncStorage.setItem('tracingEnabled', JSON.stringify(tracingEnabled));
+
+      console.log('✅ Informations utilisateur stockées avec succès');
+    } catch (error) {
+      console.error('❌ Erreur stockage user info:', error);
+      // Ne pas throw l'erreur pour ne pas bloquer le login
+      // Définir des valeurs par défaut
+      await AsyncStorage.setItem('tracingEnabled', JSON.stringify(false));
+    }
   }
 
   // Déconnexion

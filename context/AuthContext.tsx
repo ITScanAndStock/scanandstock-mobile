@@ -1,5 +1,4 @@
 // contexts/AuthContext.tsx
-import UserService from '@/services/UserService';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AuthService from '../services/AuthService';
 
@@ -45,12 +44,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 	const login = async () => {
 		try {
+			console.log('🔐 AuthContext - Tentative de connexion...');
 			setIsLoading(true);
-			const result = await AuthService.login();
 
-			if (result) {
+			// Appeler le service d'authentification
+			const success = await AuthService.login();
+
+			if (success) {
 				setIsAuthenticated(true);
-				UserService.stockUserAccounts();
+			} else {
+				console.log('❌ AuthContext - Connexion échouée');
+				setIsAuthenticated(false);
 			}
 		} catch (error) {
 			console.error('❌ Erreur de connexion:', error);
