@@ -1,6 +1,7 @@
 import { Account } from '@/model/Account';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useAuth } from './AuthContext';
 
 interface AccountContextType {
 	accounts: Account[];
@@ -18,10 +19,11 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 	const [activeAccount, setActiveAccountState] = useState<Account | null>(null);
 	const [isTracingEnabled, setIsTracingEnabled] = useState<boolean>(true);
 	const [isLoading, setIsLoading] = useState(true);
+	const { isAuthenticated } = useAuth();
 
 	useEffect(() => {
 		loadAccounts();
-	}, []);
+	}, [isAuthenticated]);
 
 	const loadAccounts = async () => {
 		try {

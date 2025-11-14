@@ -8,7 +8,6 @@ import { Link } from 'expo-router';
 // import svg and icons
 import Badge from '@/assets/images/badge.svg';
 import ScanLine from '@/assets/images/scan-line.svg';
-import AntDesign from '@expo/vector-icons/AntDesign';
 
 // import components
 import ChoosAccount from '@/components/ChooseAccount';
@@ -16,6 +15,7 @@ import ScanBadge from '@/components/ScanBadge';
 import ThemedText from '@/components/ui-components/ThemedText';
 
 // importe constants
+import Stat from '@/components/ui-components/Stat';
 import { colors } from '@/constants/colors';
 import { useAccount } from '@/context/AccountContext';
 import { StatsModel } from '@/model/Stats';
@@ -65,27 +65,10 @@ export default function Scan() {
 				/>
 				{stats?.map((stat, index) => {
 					return (
-						<ThemedText
-							variant="productDesignation"
+						<Stat
 							key={index}
-							numberOfLines={1}
-							ellipsizeMode="tail"
-						>
-							{stat.type === 'increase' ? (
-								<AntDesign
-									name="arrow-up"
-									size={24}
-									color="green"
-								/>
-							) : (
-								<AntDesign
-									name="arrow-down"
-									size={24}
-									color="red"
-								/>
-							)}
-							{stat.designation}
-						</ThemedText>
+							{...stat}
+						/>
 					);
 				})}
 			</View>

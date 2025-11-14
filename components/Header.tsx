@@ -1,5 +1,5 @@
 // import react native
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 // import expo
 import { Link } from 'expo-router';
@@ -10,6 +10,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 // import constants
 import { colors } from '@/constants/colors';
 import { useAccount } from '@/context/AccountContext';
+import Logo from '../assets/images/logo.svg';
 import { useAuth } from '../context/AuthContext';
 
 // header of the application
@@ -24,11 +25,11 @@ export default function Header() {
 
 	return (
 		<View style={styles.container}>
-			<Link href={'/'}>
-				<Image
-					style={styles.img}
-					source={require('../assets/images/logo.png')}
-				/>
+			<Link
+				style={styles.link}
+				href={'/'}
+			>
+				<Logo width={120} />
 			</Link>
 			<Pressable onPress={handleLogout}>
 				<FontAwesome
@@ -44,12 +45,15 @@ export default function Header() {
 export const styles = StyleSheet.create({
 	container: {
 		width: '100%',
-		height: 60,
 		backgroundColor: colors.GREY,
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
-		padding: 12,
+		paddingVertical: 6,
+		paddingHorizontal: 12,
+	},
+	link: {
+		height: 60,
 	},
 	img: {
 		width: 120,

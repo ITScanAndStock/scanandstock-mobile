@@ -1,13 +1,14 @@
 export const keycloakConfig = {
-  url: 'https://staging-sso.myscanandstock.fr/',
-  realm: 'scan-and-stock',
-  clientId: 'scanandstock-mobile',
-  redirectUri: 'exp://localhost:8081', // Pour développement
-  // redirectUri: 'myapp://callback', // Pour production
+	url: 'https://staging-sso.myscanandstock.fr/',
+	realm: 'scan-and-stock',
+	clientId: 'scanandstock-mobile',
+	redirectUri: 'exp://localhost:8081', // Pour développement
+	// redirectUri: 'myapp://callback', // Pour production
 };
 
 export const apiConfig = {
-  apiUrl: 'https://staging-api.myscanandstock.fr/api',
-  coompyUrl: 'https://staging-api.mycoompy.fr/api',
-  myCoompy: 'https://staging.mycoompy.fr'
+	// apiUrl: 'https://staging-api.myscanandstock.fr/api',
+	apiUrl: 'http://192.168.1.28:8080/api',
+	coompyUrl: 'https://staging-api.mycoompy.fr/api',
+	myCoompy: 'https://staging.mycoompy.fr',
 };
