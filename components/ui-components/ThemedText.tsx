@@ -2,7 +2,7 @@
 import { StyleSheet, Text, TextProps } from 'react-native';
 
 // importr constants
-import { colors } from '@/constants/colors';
+import { colors } from '../../constants/colors';
 
 // type of props
 type Props = TextProps & {

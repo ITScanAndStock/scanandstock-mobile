@@ -8,9 +8,9 @@ import { Link } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 // import constants
-import { colors } from '@/constants/colors';
-import { useAccount } from '@/context/AccountContext';
 import Logo from '../assets/images/logo.svg';
+import { colors } from '../constants/colors';
+import { useAccount } from '../context/AccountContext';
 import { useAuth } from '../context/AuthContext';
 
 // header of the application

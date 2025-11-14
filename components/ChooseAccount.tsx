@@ -1,9 +1,9 @@
-import { colors } from '@/constants/colors';
-import { useAccount } from '@/context/AccountContext';
-import { Account } from '@/model/Account';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Animated, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { colors } from '../constants/colors';
+import { useAccount } from '../context/AccountContext';
+import { Account } from '../model/Account';
 import ThemedText from './ui-components/ThemedText';
 
 export default function ChoosAccount() {

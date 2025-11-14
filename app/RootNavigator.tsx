@@ -3,10 +3,10 @@ import React, { useEffect } from 'react';
 import 'react-native-reanimated';
 
 // import expo
-import { colors } from '@/constants/colors';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { ActivityIndicator, View } from 'react-native';
+import { colors } from '../constants/colors';
 import { useAuth } from '../context/AuthContext';
 
 export default function RootNavigator() {

@@ -11,7 +11,7 @@ import Feather from '@expo/vector-icons/Feather';
 import ThemedText from './ui-components/ThemedText';
 
 // import constants
-import { colors } from '@/constants/colors';
+import { colors } from '../constants/colors';
 
 // types of props
 type GoBackHeaderProps = TextProps & {

@@ -6,21 +6,21 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Link } from 'expo-router';
 
 // import svg and icons
-import Badge from '@/assets/images/badge.svg';
-import ScanLine from '@/assets/images/scan-line.svg';
+import Badge from '../../assets/images/badge.svg';
+import ScanLine from '../../assets/images/scan-line.svg';
 
 // import components
-import ChoosAccount from '@/components/ChooseAccount';
-import ScanBadge from '@/components/ScanBadge';
-import ThemedText from '@/components/ui-components/ThemedText';
+import ChoosAccount from '../../components/ChooseAccount';
+import ScanBadge from '../../components/ScanBadge';
+import ThemedText from '../../components/ui-components/ThemedText';
 
 // importe constants
-import Stat from '@/components/ui-components/Stat';
-import { colors } from '@/constants/colors';
-import { useAccount } from '@/context/AccountContext';
-import { StatsModel } from '@/model/Stats';
-import ProductService from '@/services/ProductService';
 import { useEffect, useState } from 'react';
+import Stat from '../../components/ui-components/Stat';
+import { colors } from '../../constants/colors';
+import { useAccount } from '../../context/AccountContext';
+import { StatsModel } from '../../model/Stats';
+import ProductService from '../../services/ProductService';
 
 export default function Scan() {
 	const { isTracingEnabled, activeAccount } = useAccount();

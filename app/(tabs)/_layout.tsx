@@ -11,7 +11,7 @@ import Feather from '@expo/vector-icons/Feather';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 // import contants
-import { colors } from '@/constants/colors';
+import { colors } from '../../constants/colors';
 
 export default function TabLayout() {
 	// import font familly and wait to it load

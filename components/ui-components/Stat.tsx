@@ -1,5 +1,5 @@
-import { StatsModel } from '@/model/Stats';
 import AntDesign from '@expo/vector-icons/AntDesign';
+import { StatsModel } from '../../model/Stats';
 import ThemedText from './ThemedText';
 
 interface StatProps extends StatsModel {

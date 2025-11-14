@@ -1,7 +1,7 @@
-import { colors } from '@/constants/colors';
-import { Method } from '@/model/Stock';
 import { useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { colors } from '../constants/colors';
+import { Method } from '../model/Stock';
 import ThemedText from './ui-components/ThemedText';
 
 export default function MouvementButton({ setMethod }: any) {

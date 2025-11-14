@@ -1,6 +1,6 @@
-import { StatsResponse } from '@/model/Stats';
-import { Method, StockModel } from '@/model/Stock';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { StatsResponse } from '../model/Stats';
+import { Method, StockModel } from '../model/Stock';
 import apiClient from './ApiService';
 
 class ProductService {

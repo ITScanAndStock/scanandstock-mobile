@@ -9,8 +9,8 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 
 // import components
-import Header from '@/components/Header';
-import { AccountProvider } from '@/context/AccountContext';
+import Header from '../components/Header';
+import { AccountProvider } from '../context/AccountContext';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import RootNavigator from './RootNavigator';
 

@@ -8,12 +8,12 @@ import { Button, StyleSheet, Text, Vibration, View } from 'react-native';
 import { BarcodeScanningResult, BarcodeType, CameraView, useCameraPermissions } from 'expo-camera';
 
 // import components
-import GoBackHeader from '@/components/GoBackHeader';
-import MouvementButton from '@/components/MouvementButton';
-import { useAccount } from '@/context/AccountContext';
-import { StatsModel } from '@/model/Stats';
-import { Method } from '@/model/Stock';
-import ProductService from '@/services/ProductService';
+import GoBackHeader from '../components/GoBackHeader';
+import MouvementButton from '../components/MouvementButton';
+import { useAccount } from '../context/AccountContext';
+import { StatsModel } from '../model/Stats';
+import { Method } from '../model/Stock';
+import ProductService from '../services/ProductService';
 
 export default function Scanner() {
 	const [permission, requestPermission] = useCameraPermissions();

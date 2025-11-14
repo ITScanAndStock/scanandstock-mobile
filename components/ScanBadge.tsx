@@ -2,13 +2,13 @@
 import { StyleSheet, View } from 'react-native';
 
 // import svg and icons
-import Exclamation from '@/assets/images/exclamation-triangle.svg';
+import Exclamation from '../assets/images/exclamation-triangle.svg';
 
 // import components
 import ThemedText from './ui-components/ThemedText';
 
 // import constants
-import { colors } from '@/constants/colors';
+import { colors } from '../constants/colors';
 
 // components that show to the users if there are log in with badge or not
 export default function ScanBadge() {
