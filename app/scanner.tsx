@@ -10,6 +10,7 @@ import { BarcodeScanningResult, BarcodeType, CameraView, useCameraPermissions } 
 // import components
 import Stat from '@/components/ui-components/Stat';
 import { useAccount } from '@/context/AccountContext';
+import { router } from 'expo-router';
 import GoBackHeader from '../components/GoBackHeader';
 import MouvementButton from '../components/MouvementButton';
 import ScanLoader from '../components/ScanLoader';
@@ -58,6 +59,7 @@ export default function Scanner() {
 		} finally {
 			setIsBadgeProcessing(false);
 			setIsScanning(true);
+			router.navigate('/');
 		}
 	};
 

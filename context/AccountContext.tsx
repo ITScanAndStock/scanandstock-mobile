@@ -14,6 +14,7 @@ interface AccountContextType {
 	activeBadgeId: string;
 	activeBadgeName: string;
 	getBadge: (badge: string) => Promise<void>;
+	resetBadge: () => Promise<void>;
 }
 
 const AccountContext = createContext<AccountContextType | undefined>(undefined);
@@ -89,7 +90,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 
 			if (badgeId && userName && badgeScan) {
 				setActiveBadgeId(badgeId);
-				setActiveBadgeName(userName);
+				setActiveBadgeName(JSON.parse(userName));
 				setActiveBadgeScan(badgeScan);
 			}
 		} catch (error) {
@@ -98,6 +99,29 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 			}
 		} finally {
 			setIsLoading(false);
+		}
+	};
+
+	const resetBadge = async () => {
+		try {
+			// Supprimer les données du badge de AsyncStorage
+			await AsyncStorage.removeItem('badge_id');
+			await AsyncStorage.removeItem('user_name');
+			await AsyncStorage.removeItem('badge-scan');
+
+			// Réinitialiser les états
+			setActiveBadgeId('');
+			setActiveBadgeName('');
+			setActiveBadgeScan('');
+			setBadgeConnected(false);
+
+			if (__DEV__) {
+				console.log('✅ Badge déconnecté');
+			}
+		} catch (error) {
+			if (__DEV__) {
+				console.error('Erreur lors de la déconnexion du badge:', error);
+			}
 		}
 	};
 
@@ -120,7 +144,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 		}
 	};
 
-	return <AccountContext.Provider value={{ accounts, activeAccount, setActiveAccount, isLoading, isTracingEnabled, resetAccount, activeBadgeId, activeBadgeName, getBadge }}>{children}</AccountContext.Provider>;
+	return <AccountContext.Provider value={{ accounts, activeAccount, setActiveAccount, isLoading, isTracingEnabled, resetAccount, activeBadgeId, activeBadgeName, getBadge, resetBadge }}>{children}</AccountContext.Provider>;
 }
 
 export function useAccount() {

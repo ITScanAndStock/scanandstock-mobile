@@ -1,39 +1,21 @@
 // import react native
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 // import svg and icons
-import Exclamation from '../assets/images/exclamation-triangle.svg';
 
 // import components
-import ThemedText from './ui-components/ThemedText';
 
 // import constants
+import { useAccount } from '@/context/AccountContext';
 import { colors } from '../constants/colors';
+import BadgesScanned from './ui-components/BadgeScanned';
+import NoBadgeScanned from './ui-components/NoBadgeScanned';
 
 // components that show to the users if there are log in with badge or not
 export default function ScanBadge() {
-	return (
-		<View
-			style={styles.container}
-			accessible={true}
-			accessibilityRole="alert"
-			accessibilityLabel="Scannez votre badge pour continuer"
-			accessibilityLiveRegion="polite"
-		>
-			<Exclamation
-				height={30}
-				width={30}
-				color={colors.WHITE}
-				accessible={false}
-			/>
-			<ThemedText
-				variant="regularText"
-				color="WHITE"
-			>
-				Scannez votre badge
-			</ThemedText>
-		</View>
-	);
+	const { activeBadgeName } = useAccount();
+
+	return activeBadgeName ? <BadgesScanned name={activeBadgeName} /> : <NoBadgeScanned />;
 }
 
 export const styles = StyleSheet.create({
