@@ -45,6 +45,11 @@ export default function ChoosAccount() {
 			<TouchableOpacity
 				style={styles.mainBtn}
 				onPress={toggleDropdown}
+				accessible={true}
+				accessibilityRole="button"
+				accessibilityLabel={`Compte actif: ${activeAccount?.name}`}
+				accessibilityHint={`Appuyez pour ${isOpen ? 'fermer' : 'ouvrir'} la liste des comptes`}
+				accessibilityState={{ expanded: isOpen }}
 			>
 				<ThemedText
 					variant="title"
@@ -57,17 +62,27 @@ export default function ChoosAccount() {
 						name="chevron-down"
 						size={24}
 						color={colors.WHITE}
+						accessible={false}
 					/>
 				</Animated.View>
 			</TouchableOpacity>
 
-			<Animated.View style={[styles.dropdownContainer, { height: dropdownHeight, overflow: 'hidden' }]}>
+			<Animated.View
+				style={[styles.dropdownContainer, { height: dropdownHeight, overflow: 'hidden' }]}
+				accessible={false}
+			>
 				{accounts.map((item) => {
+					const isSelected = item.id === activeAccount?.id;
 					return (
 						<TouchableOpacity
 							key={item.id}
 							onPress={() => chooseAccount(item)}
 							style={styles.items}
+							accessible={true}
+							accessibilityRole="radio"
+							accessibilityLabel={item.name}
+							accessibilityState={{ selected: isSelected, checked: isSelected }}
+							accessibilityHint="Appuyez pour changer de compte"
 						>
 							<ThemedText
 								variant="textBtn"
@@ -75,17 +90,19 @@ export default function ChoosAccount() {
 							>
 								{item.name}
 							</ThemedText>
-							{item.id === activeAccount?.id ? (
+							{isSelected ? (
 								<Ionicons
 									name="radio-button-on"
 									size={24}
 									color={colors.WHITE}
+									accessible={false}
 								/>
 							) : (
 								<Ionicons
 									name="radio-button-off"
 									size={24}
 									color={colors.WHITE}
+									accessible={false}
 								/>
 							)}
 						</TouchableOpacity>

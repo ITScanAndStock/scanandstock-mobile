@@ -1,5 +1,5 @@
 // import react
-import { useEffect, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 // import react native
 import { Button, StyleSheet, Text, Vibration, View } from 'react-native';
@@ -10,33 +10,33 @@ import { BarcodeScanningResult, BarcodeType, CameraView, useCameraPermissions } 
 // import components
 import GoBackHeader from '../components/GoBackHeader';
 import MouvementButton from '../components/MouvementButton';
-import { useAccount } from '../context/AccountContext';
-import { StatsModel } from '../model/Stats';
+import ScanLoader from '../components/ScanLoader';
+import { useStats } from '../hooks/useStats';
 import { Method } from '../model/Stock';
 import ProductService from '../services/ProductService';
 
 export default function Scanner() {
 	const [permission, requestPermission] = useCameraPermissions();
 	const [isScanning, setIsScanning] = useState<boolean>(true);
-	const typeOfAcceptScan: BarcodeType[] = ['qr', 'aztec', 'codabar', 'code128', 'code39', 'code93', 'datamatrix', 'ean13', 'ean8', 'itf14', 'pdf417', 'upc_a', 'upc_a', 'upc_e'];
-	const { activeAccount } = useAccount();
-	const [stats, setStats] = useState<StatsModel[]>();
+
+	// Mémoiser les types de codes-barres pour éviter de recréer le tableau à chaque render
+	const typeOfAcceptScan: BarcodeType[] = useMemo(() => ['qr', 'aztec', 'codabar', 'code128', 'code39', 'code93', 'datamatrix', 'ean13', 'ean8', 'itf14', 'pdf417', 'upc_a', 'upc_e'], []);
+
+	const { reload: reloadStats } = useStats();
 	const [scannedCode, setScannedCode] = useState('');
 	const [scanCount, setScanCount] = useState(0);
 	const [method, setMethod] = useState(Method.decrease);
+	const [isProcessing, setIsProcessing] = useState(false);
 
-	useEffect(() => {
-		loadStats();
-	}, [activeAccount]);
+	// Utiliser useRef pour éviter de bloquer le scan pendant le traitement
+	const processingRef = useRef(false);
+	const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-	const loadStats = async () => {
-		try {
-			const response = await ProductService.getStats();
-			setStats(response);
-		} catch (error) {
-			console.error('❌ Erreur chargement stats:', error);
-		}
-	};
+	// Mémoiser le callback de changement de méthode
+	const handleMethodChange = useCallback((newMethod: Method) => {
+		setMethod(newMethod);
+	}, []);
+
 	if (!permission) {
 		// Camera permissions are still loading.
 		return <View />;
@@ -45,65 +45,110 @@ export default function Scanner() {
 	if (!permission.granted) {
 		// Camera permissions are not granted yet.
 		return (
-			<View style={styles.container}>
-				<Text style={styles.message}>Nous avons besoins de votre permission pour utiliser la caméra</Text>
+			<View
+				style={styles.container}
+				accessible={true}
+				accessibilityLabel="Permission de la caméra requise"
+			>
+				<Text
+					style={styles.message}
+					accessible={true}
+					accessibilityRole="text"
+				>
+					Nous avons besoins de votre permission pour utiliser la caméra
+				</Text>
 				<Button
 					onPress={requestPermission}
-					title="grant permission"
+					title="Autoriser la caméra"
+					accessibilityLabel="Autoriser la caméra"
 				/>
 			</View>
 		);
 	}
 
-	function handleBarcodeScanned({ data }: BarcodeScanningResult) {
-		// Ignorer si le scanner est désactivé
-		if (!isScanning || !data) {
-			return;
-		}
-		const cleanedCode = data.replace(/\x1D/g, '$'); // \x1D = caractère GS
-
-		// 1. Si c'est un nouveau code différent du précédent en cours de vérification
-		if (cleanedCode !== scannedCode) {
-			// ✅ Remplacer les caractères GS (ASCII 29) par $
-			setScannedCode(cleanedCode);
-			setScanCount(1);
-			return;
-		}
-
-		// 2. Si c'est le MÊME code que la frame précédente
-		if (cleanedCode === scannedCode) {
-			// Si on l'a vu assez de fois (ex: 5 frames successives)
-			if (scanCount >= 5) {
-				Vibration.vibrate(100);
-				ProductService.scan(scannedCode, method);
-				setScannedCode(''); // Reset pour le prochain
-				setScanCount(0);
-				setIsScanning(false);
-				setTimeout(() => {
-					setIsScanning(true);
-				}, 2000);
-			} else {
-				// On incrémente le compteur de confiance
-				setScanCount(scanCount + 1);
+	// Mémoiser le handler pour éviter les re-renders inutiles de CameraView
+	const handleBarcodeScanned = useCallback(
+		({ data }: BarcodeScanningResult) => {
+			// Ignorer si déjà en traitement ou scanner désactivé
+			if (!isScanning || !data || processingRef.current) {
+				return;
 			}
-		}
-	}
+
+			const cleanedCode = data.replace(/\x1D/g, '$'); // \x1D = caractère GS
+
+			// 1. Si c'est un nouveau code différent du précédent
+			if (cleanedCode !== scannedCode) {
+				setScannedCode(cleanedCode);
+				setScanCount(1);
+				return;
+			}
+
+			// 2. Si c'est le MÊME code que la frame précédente
+			if (cleanedCode === scannedCode) {
+				// Si on l'a vu assez de fois (3 frames au lieu de 5 pour plus de réactivité)
+				if (scanCount >= 2) {
+					// Marquer comme en traitement immédiatement
+					processingRef.current = true;
+					setIsProcessing(true);
+					setIsScanning(false);
+
+					// Vibration haptique
+					Vibration.vibrate(100);
+
+					// Appel API optimisé
+					ProductService.scan(cleanedCode, method)
+						.then(() => {
+							// Recharger les stats en arrière-plan
+							reloadStats();
+						})
+						.catch((error) => {
+							console.error('❌ Erreur lors du scan:', error);
+						})
+						.finally(() => {
+							setIsProcessing(false);
+							processingRef.current = false;
+						});
+
+					// Reset immédiat pour le prochain scan
+					setScannedCode('');
+					setScanCount(0);
+
+					// Réactiver le scan après un délai réduit
+					if (timeoutRef.current) {
+						clearTimeout(timeoutRef.current);
+					}
+					timeoutRef.current = setTimeout(() => {
+						setIsScanning(true);
+					}, 1500); // Réduit de 2000ms à 1500ms
+				} else {
+					// Incrémenter le compteur
+					setScanCount((prev) => prev + 1);
+				}
+			}
+		},
+		[isScanning, scannedCode, scanCount, method, reloadStats]
+	);
+
+	// Mémoiser les settings du scanner
+	const barcodeScannerSettings = useMemo(
+		() => ({
+			barcodeTypes: typeOfAcceptScan,
+		}),
+		[typeOfAcceptScan]
+	);
 
 	return (
 		<View style={styles.container}>
 			<CameraView
 				style={styles.camera}
-				barcodeScannerSettings={{
-					barcodeTypes: typeOfAcceptScan,
-				}}
-				onBarcodeScanned={(event) => {
-					handleBarcodeScanned(event);
-				}}
+				barcodeScannerSettings={barcodeScannerSettings}
+				onBarcodeScanned={handleBarcodeScanned}
 			/>
 			<GoBackHeader />
 			<View style={styles.foot}>
-				<MouvementButton setMethod={setMethod} />
+				<MouvementButton setMethod={handleMethodChange} />
 			</View>
+			<ScanLoader visible={isProcessing} />
 		</View>
 	);
 }

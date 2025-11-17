@@ -1,14 +1,50 @@
+import Constants from 'expo-constants';
+
+/**
+ * Récupère les variables d'environnement depuis expo-constants
+ * Ces variables sont définies dans les fichiers .env.*
+ */
+const env = process.env.EXPO_PUBLIC_ENV || Constants.expoConfig?.extra?.env || 'staging';
+
+// Fonction helper pour récupérer les variables d'environnement
+const getEnvVar = (key: string, defaultValue: string = ''): string => {
+	// En développement, process.env est prioritaire
+	const envValue = process.env[`EXPO_PUBLIC_${key}`];
+	if (envValue) {
+		return envValue;
+	}
+
+	// Pour les builds EAS, utiliser Constants
+	const constantValue = Constants.expoConfig?.extra?.[key];
+	if (constantValue) {
+		return constantValue;
+	}
+
+	if (!defaultValue) {
+		console.warn(`⚠️ Variable d'environnement ${key} non définie`);
+	}
+
+	return defaultValue;
+};
+
 export const keycloakConfig = {
-	url: 'https://staging-sso.myscanandstock.fr/',
-	realm: 'scan-and-stock',
-	clientId: 'scanandstock-mobile',
-	redirectUri: 'exp://localhost:8081', // Pour développement
-	// redirectUri: 'myapp://callback', // Pour production
+	url: getEnvVar('KEYCLOAK_URL', 'https://staging-sso.myscanandstock.fr/'),
+	realm: getEnvVar('KEYCLOAK_REALM', 'scan-and-stock'),
+	clientId: getEnvVar('KEYCLOAK_CLIENT_ID', 'scanandstock-mobile'),
 };
 
 export const apiConfig = {
-	// apiUrl: 'https://staging-api.myscanandstock.fr/api',
-	apiUrl: 'http://192.168.1.28:8080/api',
-	coompyUrl: 'https://staging-api.mycoompy.fr/api',
-	myCoompy: 'https://staging.mycoompy.fr',
+	apiUrl: getEnvVar('API_URL', 'https://staging-api.myscanandstock.fr/api'),
+	coompyUrl: getEnvVar('COOMPY_URL', 'https://staging-api.mycoompy.fr/api'),
+	myCoompy: getEnvVar('MY_COOMPY_URL', 'https://staging.mycoompy.fr'),
 };
+
+// Exporter l'environnement actuel
+export const currentEnv = env;
+
+// Log pour debug (à retirer en production)
+if (__DEV__) {
+	console.log('🌍 Environment:', env);
+	console.log('🔧 Keycloak URL:', keycloakConfig.url);
+	console.log('🔧 API URL:', apiConfig.apiUrl);
+}

@@ -34,13 +34,16 @@ export default function GoBackHeader({ title = 'Retour au scan rapide', onPress 
 			<TouchableOpacity
 				style={styles.backButton}
 				onPress={handlePress}
+				accessible={true}
 				accessibilityRole="button"
 				accessibilityLabel="Retour"
+				accessibilityHint={`Appuyez pour ${onPress ? 'revenir en arrière' : 'retourner au scan rapide'}`}
 			>
 				<Feather
 					name="chevron-left"
 					size={40}
 					color={colors.WHITE}
+					accessible={false}
 				/>
 				<ThemedText
 					variant="title"

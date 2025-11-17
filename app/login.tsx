@@ -17,27 +17,65 @@ const LoginScreen = () => {
 	};
 
 	if (isLoading) {
-		return <ActivityIndicator size="large" />;
+		return (
+			<View
+				style={styles.container}
+				accessible={true}
+				accessibilityLabel="Connexion en cours"
+			>
+				<ActivityIndicator
+					size="large"
+					color={colors.DARK}
+					accessibilityLabel="Chargement"
+				/>
+				<ThemedText
+					variant="regularText"
+					color="DARK"
+					style={{ marginTop: 20 }}
+				>
+					Connexion en cours...
+				</ThemedText>
+			</View>
+		);
 	}
 
 	return (
-		<View style={styles.container}>
+		<View
+			style={styles.container}
+			accessible={false}
+		>
 			<LogoVertical
 				width={200}
 				height={200}
+				accessible={true}
+				accessibilityLabel="Logo ScanAndStock"
+				accessibilityRole="image"
 			/>
 
 			<TouchableOpacity
 				onPress={handleLogin}
 				activeOpacity={0.8}
-				style={styles.btn}
+				style={[styles.btn, isLoading && styles.btnDisabled]}
+				disabled={isLoading}
+				accessible={true}
+				accessibilityLabel="Se connecter"
+				accessibilityHint="Appuyez pour vous connecter avec votre compte"
+				accessibilityRole="button"
+				accessibilityState={{ disabled: isLoading }}
 			>
-				<ThemedText
-					variant="textBtn"
-					color="WHITE"
-				>
-					Se connecter
-				</ThemedText>
+				{isLoading ? (
+					<ActivityIndicator
+						size="small"
+						color={colors.WHITE}
+					/>
+				) : (
+					<ThemedText
+						variant="textBtn"
+						color="WHITE"
+					>
+						Se connecter
+					</ThemedText>
+				)}
 			</TouchableOpacity>
 		</View>
 	);
@@ -57,5 +95,8 @@ const styles = StyleSheet.create({
 		paddingVertical: 10,
 		paddingHorizontal: 20,
 		borderRadius: 20,
+	},
+	btnDisabled: {
+		opacity: 0.5,
 	},
 });

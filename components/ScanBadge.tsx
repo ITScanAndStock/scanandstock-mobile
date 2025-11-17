@@ -13,11 +13,18 @@ import { colors } from '../constants/colors';
 // components that show to the users if there are log in with badge or not
 export default function ScanBadge() {
 	return (
-		<View style={styles.container}>
+		<View
+			style={styles.container}
+			accessible={true}
+			accessibilityRole="alert"
+			accessibilityLabel="Scannez votre badge pour continuer"
+			accessibilityLiveRegion="polite"
+		>
 			<Exclamation
 				height={30}
 				width={30}
 				color={colors.WHITE}
+				accessible={false}
 			/>
 			<ThemedText
 				variant="regularText"

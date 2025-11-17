@@ -1,6 +1,7 @@
 // contexts/AuthContext.tsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AuthService from '../services/AuthService';
+import ToastService from '../services/ToastService';
 
 interface AuthContextData {
 	isAuthenticated: boolean;
@@ -52,25 +53,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 			if (success) {
 				setIsAuthenticated(true);
+				ToastService.success('Connexion réussie', 'Bienvenue');
 			} else {
 				console.log('❌ AuthContext - Connexion échouée');
 				setIsAuthenticated(false);
+				ToastService.error('La connexion a échoué', 'Erreur de connexion');
 			}
 		} catch (error) {
 			console.error('❌ Erreur de connexion:', error);
 			setIsAuthenticated(false);
+			ToastService.error('Une erreur est survenue lors de la connexion', 'Erreur');
 		} finally {
 			setIsLoading(false);
 		}
 	};
-
 	const logout = async () => {
 		try {
 			setIsLoading(true);
 			await AuthService.logout();
 			setIsAuthenticated(false);
+			ToastService.info('Vous avez été déconnecté', 'Déconnexion');
 		} catch (error) {
 			console.error('Erreur de déconnexion:', error);
+			ToastService.error('Erreur lors de la déconnexion', 'Erreur');
 		} finally {
 			setIsLoading(false);
 		}

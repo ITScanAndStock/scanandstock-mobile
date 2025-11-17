@@ -1,5 +1,5 @@
 // import react native
-import { StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 // import expo
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,62 +15,71 @@ import ScanBadge from '../../components/ScanBadge';
 import ThemedText from '../../components/ui-components/ThemedText';
 
 // importe constants
-import { useEffect, useState } from 'react';
 import Stat from '../../components/ui-components/Stat';
 import { colors } from '../../constants/colors';
 import { useAccount } from '../../context/AccountContext';
-import { StatsModel } from '../../model/Stats';
-import ProductService from '../../services/ProductService';
+import { useStats } from '../../hooks/useStats';
 
 export default function Scan() {
-	const { isTracingEnabled, activeAccount } = useAccount();
-	const [stats, setStats] = useState<StatsModel[]>();
-
-	useEffect(() => {
-		loadStats();
-	}, [activeAccount]);
-
-	const loadStats = async () => {
-		try {
-			const response = await ProductService.getStats();
-			setStats(response);
-		} catch (error) {
-			console.error('❌ Erreur chargement stats:', error);
-		}
-	};
+	const { isTracingEnabled } = useAccount();
+	const { stats, isLoading } = useStats();
 
 	return (
 		<View style={styles.container}>
-			<Badge style={styles.svg} />
+			<Badge
+				style={styles.svg}
+				accessible={true}
+				accessibilityLabel="Badge ScanAndStock"
+				accessibilityRole="image"
+			/>
 			<ChoosAccount />
 			{isTracingEnabled === true ? <ScanBadge /> : null}
 
 			<Link
 				style={styles.btn}
 				href="/scanner"
+				accessible={true}
+				accessibilityLabel="Scanner un produit"
+				accessibilityHint="Ouvre la caméra pour scanner un code-barres"
+				accessibilityRole="button"
 			>
 				<View style={styles.btnContent}>
 					<ScanLine
 						width={24}
 						height={24}
+						accessible={false}
+						importantForAccessibility="no"
 					/>
 					<ThemedText variant="textBtn"> scannez</ThemedText>
 				</View>
 			</Link>
 
-			<View style={styles.historyContainer}>
+			<View
+				style={styles.historyContainer}
+				accessible={true}
+				accessibilityLabel="Historique des dernières statistiques"
+				accessibilityRole="list"
+			>
 				<LinearGradient
 					style={styles.backgroundGradient}
 					colors={['#12A19A40', '#12A19A1C']}
 				/>
-				{stats?.map((stat, index) => {
-					return (
-						<Stat
-							key={index}
-							{...stat}
-						/>
-					);
-				})}
+				{isLoading ? (
+					<ActivityIndicator
+						size="large"
+						color={colors.DARK}
+						accessibilityLabel="Chargement des statistiques"
+					/>
+				) : (
+					stats?.map((stat, index) => {
+						return (
+							<Stat
+								key={index}
+								{...stat}
+							/>
+						);
+					})
+				)}
 			</View>
 		</View>
 	);

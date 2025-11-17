@@ -28,14 +28,28 @@ export default function Header() {
 			<Link
 				style={styles.link}
 				href={'/'}
+				accessible={true}
+				accessibilityLabel="Accueil"
+				accessibilityRole="link"
+				accessibilityHint="Retourner à la page d'accueil"
 			>
-				<Logo width={120} />
+				<Logo
+					width={120}
+					accessible={false}
+				/>
 			</Link>
-			<Pressable onPress={handleLogout}>
+			<Pressable
+				onPress={handleLogout}
+				accessible={true}
+				accessibilityLabel="Déconnexion"
+				accessibilityRole="button"
+				accessibilityHint="Appuyez pour vous déconnecter"
+			>
 				<FontAwesome
 					name="power-off"
 					size={30}
 					color={colors.WHITE}
+					accessible={false}
 				/>
 			</Pressable>
 		</View>

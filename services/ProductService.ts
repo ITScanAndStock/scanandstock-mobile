@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatsResponse } from '../model/Stats';
 import { Method, StockModel } from '../model/Stock';
 import apiClient from './ApiService';
+import ToastService from './ToastService';
 
 class ProductService {
 	async getStats() {
@@ -26,10 +27,12 @@ class ProductService {
 			console.error('Status:', error.response?.status);
 			console.error('Message:', error.response?.data);
 			console.error('URL:', error.config?.url);
+
+			const errorMessage = error.response?.data?.message || 'Impossible de charger les statistiques';
+			ToastService.error(errorMessage);
 			throw error;
 		}
 	}
-
 	async scan(code: string, method: Method) {
 		try {
 			const activeAccountString = await AsyncStorage.getItem('activated_compte');
@@ -45,15 +48,23 @@ class ProductService {
 					'Account-Id': activeAccount.id,
 				},
 			});
+
+			// Afficher un message de succès
+			const actionText = method === Method.increase ? 'ajouté au stock' : 'retiré du stock';
+			ToastService.success(`Produit ${actionText}`, 'Succès');
+
+			return response.data;
 		} catch (error: any) {
-			console.error('❌ Erreur lors de la récupération des stats');
+			console.error('❌ Erreur lors du scan');
 			console.error('Status:', error.response?.status);
 			console.error('Message:', error.response?.data);
 			console.error('URL:', error.config?.url);
+
+			const errorMessage = error.response?.data?.message || 'Erreur lors du scan du produit';
+			ToastService.error(errorMessage);
 			throw error;
 		}
 	}
-
 	getStockModel(scan: string, method: Method): StockModel {
 		const stockModel = new StockModel();
 		stockModel.code = scan;

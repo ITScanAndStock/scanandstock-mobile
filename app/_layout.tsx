@@ -3,6 +3,7 @@ import React from 'react'; // Ajout de l'import React manquant
 import { StyleSheet } from 'react-native';
 import 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 
 // import expo
 import * as SplashScreen from 'expo-splash-screen';
@@ -25,6 +26,7 @@ function RootLayoutContent() {
 			<StatusBar style="light" />
 			{isAuthenticated && <Header />}
 			<RootNavigator />
+			<Toast />
 		</SafeAreaView>
 	);
 }

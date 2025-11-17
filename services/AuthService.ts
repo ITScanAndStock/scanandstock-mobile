@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { apiConfig, keycloakConfig } from '../config/KeycloakConfig';
+import SecureStorageService from './SecureStorageService';
 
 // Nécessaire pour que le navigateur se ferme après l'authentification
 WebBrowser.maybeCompleteAuthSession();
@@ -72,11 +73,12 @@ class AuthService {
 		}
 	}
 
-	// Stocker les tokens dans AsyncStorage
+	// Stocker les tokens de manière sécurisée
 	private async storeTokens(tokenResponse: any) {
-		await AsyncStorage.setItem('token', tokenResponse.accessToken);
-		await AsyncStorage.setItem('refreshToken', tokenResponse.refreshToken);
-		await AsyncStorage.setItem('tokenExpiry', String(Date.now() + tokenResponse.expiresIn * 1000));
+		// ✅ Tokens stockés de manière sécurisée (chiffrés)
+		await SecureStorageService.setToken(tokenResponse.accessToken);
+		await SecureStorageService.setRefreshToken(tokenResponse.refreshToken);
+		await SecureStorageService.setItem('tokenExpiry', String(Date.now() + tokenResponse.expiresIn * 1000));
 	}
 
 	// Récupérer les informations utilisateur
@@ -104,7 +106,8 @@ class AuthService {
 	// Rafraîchir le token
 	async refreshToken() {
 		try {
-			const refreshToken = await AsyncStorage.getItem('refreshToken');
+			// ✅ Récupérer le refresh token de manière sécurisée
+			const refreshToken = await SecureStorageService.getRefreshToken();
 
 			if (!refreshToken) {
 				throw new Error('Pas de refresh token disponible');
@@ -137,8 +140,9 @@ class AuthService {
 	// Vérifier si le token est valide
 	async isTokenValid(): Promise<boolean> {
 		try {
-			const tokenExpiry = await AsyncStorage.getItem('tokenExpiry');
-			const refreshToken = await AsyncStorage.getItem('refreshToken');
+			// ✅ Récupérer les données de manière sécurisée
+			const tokenExpiry = await SecureStorageService.getItem('tokenExpiry');
+			const refreshToken = await SecureStorageService.getRefreshToken();
 
 			if (!tokenExpiry || !refreshToken) {
 				return false;
@@ -172,7 +176,8 @@ class AuthService {
 		if (!isValid) {
 			return null;
 		}
-		return await AsyncStorage.getItem('token');
+		// ✅ Récupérer le token de manière sécurisée
+		return await SecureStorageService.getToken();
 	}
 
 	async getUserInfo() {
@@ -182,7 +187,8 @@ class AuthService {
 
 	async storeUserInfo() {
 		try {
-			const token = await AsyncStorage.getItem('token');
+			// ✅ Récupérer le token de manière sécurisée
+			const token = await SecureStorageService.getToken();
 
 			if (!token) {
 				throw new Error('Pas de token disponible');
@@ -230,7 +236,8 @@ class AuthService {
 	// Déconnexion
 	async logout() {
 		try {
-			const token = await AsyncStorage.getItem('token');
+			// ✅ Récupérer le token de manière sécurisée
+			const token = await SecureStorageService.getToken();
 
 			if (token) {
 				// Appeler l'endpoint de logout de Keycloak
@@ -243,8 +250,11 @@ class AuthService {
 				});
 			}
 
-			// Nettoyer le stockage local (comme dans votre code Angular)
-			await AsyncStorage.multiRemove(['token', 'refreshToken', 'tokenExpiry', 'catalogue', 'nb_account', 'activated_compte', 'lastConnection', 'first_connection', 'accountName', 'roles', 'licence', 'licenseType', 'proLink', 'tracingEnabled', 'Badge-Id']);
+			// ✅ Nettoyer les tokens sécurisés
+			await SecureStorageService.clearTokens();
+
+			// Nettoyer les autres données du stockage local
+			await AsyncStorage.multiRemove(['catalogue', 'nb_account', 'activated_compte', 'lastConnection', 'first_connection', 'accountName', 'roles', 'licence', 'licenseType', 'proLink', 'tracingEnabled', 'Badge-Id']);
 		} catch (error) {
 			console.error('Erreur lors de la déconnexion:', error);
 		}
