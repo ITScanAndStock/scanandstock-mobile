@@ -34,6 +34,18 @@
             "BROWSABLE",
             "DEFAULT"
           ]
+        },
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "scanandstock"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -65,6 +77,12 @@
       "eas": {
         "projectId": "b3291952-eb54-434f-b546-6cac13f8a086"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/b3291952-eb54-434f-b546-6cac13f8a086"
     }
   }
 }
