@@ -22,7 +22,10 @@ const LoginScreen = () => {
 
 	return (
 		<View style={styles.container}>
-			<LogoVertical />
+			<LogoVertical
+				width={200}
+				height={200}
+			/>
 
 			<TouchableOpacity
 				onPress={handleLogin}
