@@ -8,6 +8,7 @@ import { Button, StyleSheet, Text, Vibration, View } from 'react-native';
 import { BarcodeScanningResult, BarcodeType, CameraView, useCameraPermissions } from 'expo-camera';
 
 // import components
+import Stat from '@/components/ui-components/Stat';
 import GoBackHeader from '../components/GoBackHeader';
 import MouvementButton from '../components/MouvementButton';
 import ScanLoader from '../components/ScanLoader';
@@ -22,7 +23,7 @@ export default function Scanner() {
 	// Mémoiser les types de codes-barres pour éviter de recréer le tableau à chaque render
 	const typeOfAcceptScan: BarcodeType[] = useMemo(() => ['qr', 'aztec', 'codabar', 'code128', 'code39', 'code93', 'datamatrix', 'ean13', 'ean8', 'itf14', 'pdf417', 'upc_a', 'upc_e'], []);
 
-	const { reload: reloadStats } = useStats();
+	const { reload: reloadStats, stats } = useStats();
 	const [scannedCode, setScannedCode] = useState('');
 	const [scanCount, setScanCount] = useState(0);
 	const [method, setMethod] = useState(Method.decrease);
@@ -180,6 +181,19 @@ export default function Scanner() {
 			)}
 			<GoBackHeader />
 			<View style={styles.foot}>
+				<Stat
+					color="WHITE"
+					designation={stats?.[0]?.designation ?? ''}
+					type={stats?.[0]?.type ?? ''}
+					mvmtDateTime={''}
+					price={0}
+					provider={''}
+					quantity={0}
+					totalStock={0}
+					userEmail={''}
+					userName={''}
+					action={''}
+				/>
 				<MouvementButton setMethod={handleMethodChange} />
 			</View>
 			<ScanLoader visible={isProcessing} />

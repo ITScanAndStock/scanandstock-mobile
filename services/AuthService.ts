@@ -232,7 +232,7 @@ class AuthService {
 
 			// Sauvegarder tracingEnabled
 			const tracingEnabled = data.login?.tracingEnabled ?? data.tracingEnabled ?? false;
-			await AsyncStorage.setItem('tracingEnabled', JSON.stringify(data.tracingEnabled));
+			await AsyncStorage.setItem('tracingEnabled', JSON.stringify(tracingEnabled));
 
 			if (__DEV__) {
 				console.log('✅ Informations utilisateur stockées avec succès');

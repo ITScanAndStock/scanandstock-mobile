@@ -97,6 +97,7 @@ const styles = StyleSheet.create({
 		paddingVertical: 10,
 		paddingHorizontal: 20,
 		borderRadius: 20,
+		marginVertical: 30,
 	},
 	btnDisabled: {
 		opacity: 0.5,
