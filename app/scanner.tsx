@@ -1,5 +1,5 @@
 // import react
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // import react native
 import { Button, StyleSheet, Text, Vibration, View } from 'react-native';
@@ -37,35 +37,6 @@ export default function Scanner() {
 		setMethod(newMethod);
 	}, []);
 
-	if (!permission) {
-		// Camera permissions are still loading.
-		return <View />;
-	}
-
-	if (!permission.granted) {
-		// Camera permissions are not granted yet.
-		return (
-			<View
-				style={styles.container}
-				accessible={true}
-				accessibilityLabel="Permission de la caméra requise"
-			>
-				<Text
-					style={styles.message}
-					accessible={true}
-					accessibilityRole="text"
-				>
-					Nous avons besoins de votre permission pour utiliser la caméra
-				</Text>
-				<Button
-					onPress={requestPermission}
-					title="Autoriser la caméra"
-					accessibilityLabel="Autoriser la caméra"
-				/>
-			</View>
-		);
-	}
-
 	// Mémoiser le handler pour éviter les re-renders inutiles de CameraView
 	const handleBarcodeScanned = useCallback(
 		({ data }: BarcodeScanningResult) => {
@@ -75,6 +46,23 @@ export default function Scanner() {
 			}
 
 			const cleanedCode = data.replace(/\x1D/g, '$'); // \x1D = caractère GS
+
+			// Validation du code-barres
+			if (!cleanedCode || cleanedCode.length < 4 || cleanedCode.length > 100) {
+				if (__DEV__) {
+					console.warn('⚠️ Code-barres invalide (longueur):', cleanedCode);
+				}
+				return;
+			}
+
+			// Vérifier que le code contient des caractères valides
+			const validCodePattern = /^[A-Za-z0-9$\-_.+!*'(),]+$/;
+			if (!validCodePattern.test(cleanedCode)) {
+				if (__DEV__) {
+					console.warn('⚠️ Code-barres invalide (caractères):', cleanedCode);
+				}
+				return;
+			}
 
 			// 1. Si c'est un nouveau code différent du précédent
 			if (cleanedCode !== scannedCode) {
@@ -102,7 +90,9 @@ export default function Scanner() {
 							reloadStats();
 						})
 						.catch((error) => {
-							console.error('❌ Erreur lors du scan:', error);
+							if (__DEV__) {
+								console.error('❌ Erreur lors du scan:', error);
+							}
 						})
 						.finally(() => {
 							setIsProcessing(false);
@@ -137,6 +127,45 @@ export default function Scanner() {
 		[typeOfAcceptScan]
 	);
 
+	// Cleanup du timeout lors du démontage du composant
+	useEffect(() => {
+		return () => {
+			if (timeoutRef.current) {
+				clearTimeout(timeoutRef.current);
+			}
+		};
+	}, []);
+
+	// Rendu conditionnel après tous les hooks
+	if (!permission) {
+		// Camera permissions are still loading.
+		return <View style={styles.container} />;
+	}
+
+	if (!permission.granted) {
+		// Camera permissions are not granted yet.
+		return (
+			<View
+				style={styles.container}
+				accessible={true}
+				accessibilityLabel="Permission de la caméra requise"
+			>
+				<Text
+					style={styles.message}
+					accessible={true}
+					accessibilityRole="text"
+				>
+					Nous avons besoins de votre permission pour utiliser la caméra
+				</Text>
+				<Button
+					onPress={requestPermission}
+					title="Autoriser la caméra"
+					accessibilityLabel="Autoriser la caméra"
+				/>
+			</View>
+		);
+	}
+
 	return (
 		<View style={styles.container}>
 			<CameraView
@@ -144,6 +173,11 @@ export default function Scanner() {
 				barcodeScannerSettings={barcodeScannerSettings}
 				onBarcodeScanned={handleBarcodeScanned}
 			/>
+			{!isScanning && !isProcessing && (
+				<View style={styles.scannerDisabledOverlay}>
+					<Text style={styles.scannerDisabledText}>Scanner temporairement désactivé...</Text>
+				</View>
+			)}
 			<GoBackHeader />
 			<View style={styles.foot}>
 				<MouvementButton setMethod={handleMethodChange} />
@@ -189,5 +223,22 @@ const styles = StyleSheet.create({
 		justifyContent: 'flex-start',
 		alignItems: 'center',
 		gap: 8,
+	},
+	scannerDisabledOverlay: {
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		backgroundColor: 'rgba(0, 0, 0, 0.4)',
+		justifyContent: 'center',
+		alignItems: 'center',
+		zIndex: 1,
+	},
+	scannerDisabledText: {
+		color: 'white',
+		fontSize: 16,
+		fontWeight: 'bold',
+		textAlign: 'center',
 	},
 });

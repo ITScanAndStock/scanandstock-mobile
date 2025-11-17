@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { apiConfig, keycloakConfig } from '../config/KeycloakConfig';
+import { TokenResponse, UserInfo } from '../model/ApiError';
 import SecureStorageService from './SecureStorageService';
 
 // Nécessaire pour que le navigateur se ferme après l'authentification
@@ -68,21 +69,26 @@ class AuthService {
 
 			return tokenResponse;
 		} catch (error) {
-			console.error("❌ Erreur lors de l'échange du code:", error);
+			if (__DEV__) {
+				console.error("❌ Erreur lors de l'échange du code:", error);
+			}
 			throw error;
 		}
 	}
 
 	// Stocker les tokens de manière sécurisée
-	private async storeTokens(tokenResponse: any) {
+	private async storeTokens(tokenResponse: TokenResponse) {
 		// ✅ Tokens stockés de manière sécurisée (chiffrés)
 		await SecureStorageService.setToken(tokenResponse.accessToken);
-		await SecureStorageService.setRefreshToken(tokenResponse.refreshToken);
-		await SecureStorageService.setItem('tokenExpiry', String(Date.now() + tokenResponse.expiresIn * 1000));
+		if (tokenResponse.refreshToken) {
+			await SecureStorageService.setRefreshToken(tokenResponse.refreshToken);
+		}
+		const expiresIn = tokenResponse.expiresIn || 3600; // Par défaut 1 heure
+		await SecureStorageService.setItem('tokenExpiry', String(Date.now() + expiresIn * 1000));
 	}
 
 	// Récupérer les informations utilisateur
-	private async fetchUserInfo(accessToken: string) {
+	private async fetchUserInfo(accessToken: string): Promise<UserInfo> {
 		try {
 			const response = await fetch(`${keycloakConfig.url}realms/${keycloakConfig.realm}/protocol/openid-connect/userinfo`, {
 				headers: {
@@ -90,7 +96,7 @@ class AuthService {
 				},
 			});
 
-			const userInfo = await response.json();
+			const userInfo: UserInfo = await response.json();
 
 			// Stocker les infos utilisateur
 			await AsyncStorage.setItem('accountName', userInfo.name || '');
@@ -98,7 +104,9 @@ class AuthService {
 
 			return userInfo;
 		} catch (error) {
-			console.error('Erreur lors de la récupération des infos utilisateur:', error);
+			if (__DEV__) {
+				console.error('Erreur lors de la récupération des infos utilisateur:', error);
+			}
 			throw error;
 		}
 	}
@@ -208,7 +216,9 @@ class AuthService {
 			}
 
 			const data = await response.json();
-			console.log('📦 Données utilisateur reçues:', data);
+			if (__DEV__) {
+				console.log('📦 Données utilisateur reçues:', data);
+			}
 
 			// Sauvegarder les comptes
 			if (data.accounts && Array.isArray(data.accounts)) {
@@ -222,9 +232,11 @@ class AuthService {
 
 			// Sauvegarder tracingEnabled
 			const tracingEnabled = data.login?.tracingEnabled ?? data.tracingEnabled ?? false;
-			await AsyncStorage.setItem('tracingEnabled', JSON.stringify(tracingEnabled));
+			await AsyncStorage.setItem('tracingEnabled', JSON.stringify(data.tracingEnabled));
 
-			console.log('✅ Informations utilisateur stockées avec succès');
+			if (__DEV__) {
+				console.log('✅ Informations utilisateur stockées avec succès');
+			}
 		} catch (error) {
 			console.error('❌ Erreur stockage user info:', error);
 			// Ne pas throw l'erreur pour ne pas bloquer le login

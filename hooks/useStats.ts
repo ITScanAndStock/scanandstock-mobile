@@ -21,7 +21,9 @@ export function useStats() {
 			const response = await ProductService.getStats();
 			setStats(response);
 		} catch (err) {
-			console.error('❌ Erreur chargement stats:', err);
+			if (__DEV__) {
+				console.error('❌ Erreur chargement stats:', err);
+			}
 			setError(err as Error);
 		} finally {
 			setIsLoading(false);

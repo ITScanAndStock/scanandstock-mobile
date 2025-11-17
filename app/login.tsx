@@ -12,7 +12,9 @@ const LoginScreen = () => {
 		try {
 			await login();
 		} catch (error) {
-			console.error('❌ Erreur:', error);
+			if (__DEV__) {
+				console.error('❌ Erreur:', error);
+			}
 		}
 	};
 

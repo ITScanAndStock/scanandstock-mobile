@@ -47,7 +47,9 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 				setIsTracingEnabled(parsedTracingEnabled);
 			}
 		} catch (error) {
-			console.error('Erreur chargement comptes:', error);
+			if (__DEV__) {
+				console.error('Erreur chargement comptes:', error);
+			}
 		} finally {
 			setIsLoading(false);
 		}
@@ -57,7 +59,6 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 		setAccounts([]);
 		setActiveAccountState(null);
 		setIsTracingEnabled(false);
-		setIsTracingEnabled(false);
 	};
 
 	const setActiveAccount = async (account: Account) => {
@@ -65,7 +66,9 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 			await AsyncStorage.setItem('activated_compte', JSON.stringify(account));
 			setActiveAccountState(account);
 		} catch (error) {
-			console.error('Erreur sauvegarde compte actif:', error);
+			if (__DEV__) {
+				console.error('Erreur sauvegarde compte actif:', error);
+			}
 		}
 	};
 

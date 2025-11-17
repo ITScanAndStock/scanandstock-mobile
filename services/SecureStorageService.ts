@@ -13,7 +13,9 @@ class SecureStorageService {
 		try {
 			await SecureStore.setItemAsync(key, value);
 		} catch (error) {
-			console.error(`❌ Erreur lors de la sauvegarde sécurisée de ${key}:`, error);
+			if (__DEV__) {
+				console.error(`❌ Erreur lors de la sauvegarde sécurisée de ${key}:`, error);
+			}
 			throw error;
 		}
 	}
@@ -37,7 +39,9 @@ class SecureStorageService {
 		try {
 			await SecureStore.deleteItemAsync(key);
 		} catch (error) {
-			console.error(`❌ Erreur lors de la suppression sécurisée de ${key}:`, error);
+			if (__DEV__) {
+				console.error(`❌ Erreur lors de la suppression sécurisée de ${key}:`, error);
+			}
 			throw error;
 		}
 	}

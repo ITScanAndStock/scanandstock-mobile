@@ -12,17 +12,22 @@ import { useAuth } from '../context/AuthContext';
 export default function RootNavigator() {
 	const { isAuthenticated, isLoading } = useAuth();
 
-	console.log('🔍 RootNavigator - isLoading:', isLoading, 'isAuthenticated:', isAuthenticated);
-
+	if (__DEV__) {
+		console.log('🔍 RootNavigator - isLoading:', isLoading, 'isAuthenticated:', isAuthenticated);
+	}
 	useEffect(() => {
 		if (!isLoading) {
-			console.log('🎨 Masquage du splash screen');
+			if (__DEV__) {
+				console.log('🎨 Masquage du splash screen');
+			}
 			SplashScreen.hideAsync();
 		}
 	}, [isLoading]);
 
 	if (isLoading) {
-		console.log('⏳ RootNavigator - Affichage du loader');
+		if (__DEV__) {
+			console.log('⏳ RootNavigator - Affichage du loader');
+		}
 		return (
 			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
 				<ActivityIndicator
