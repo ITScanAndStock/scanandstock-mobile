@@ -9,6 +9,7 @@ import { BarcodeScanningResult, BarcodeType, CameraView, useCameraPermissions } 
 
 // import components
 import Stat from '@/components/ui-components/Stat';
+import { useAccount } from '@/context/AccountContext';
 import GoBackHeader from '../components/GoBackHeader';
 import MouvementButton from '../components/MouvementButton';
 import ScanLoader from '../components/ScanLoader';
@@ -28,6 +29,8 @@ export default function Scanner() {
 	const [scanCount, setScanCount] = useState(0);
 	const [method, setMethod] = useState(Method.decrease);
 	const [isProcessing, setIsProcessing] = useState(false);
+	const [isBadgeProcessing, setIsBadgeProcessing] = useState(false);
+	const { isTracingEnabled, activeBadgeId, activeBadgeName, getBadge } = useAccount();
 
 	// Utiliser useRef pour éviter de bloquer le scan pendant le traitement
 	const processingRef = useRef(false);
@@ -37,6 +40,26 @@ export default function Scanner() {
 	const handleMethodChange = useCallback((newMethod: Method) => {
 		setMethod(newMethod);
 	}, []);
+
+	const handleBadgeConnexion = async ({ data }: BarcodeScanningResult) => {
+		if (isBadgeProcessing) return;
+
+		setIsBadgeProcessing(true);
+		setIsScanning(false);
+
+		try {
+			await getBadge(data);
+			// Vibration à la validation
+			Vibration.vibrate(100);
+		} catch (error) {
+			if (__DEV__) {
+				console.error('❌ Erreur lors du scan du badge:', error);
+			}
+		} finally {
+			setIsBadgeProcessing(false);
+			setIsScanning(true);
+		}
+	};
 
 	// Mémoiser le handler pour éviter les re-renders inutiles de CameraView
 	const handleBarcodeScanned = useCallback(
@@ -128,6 +151,17 @@ export default function Scanner() {
 		[typeOfAcceptScan]
 	);
 
+	const handleScan = ({ data }: BarcodeScanningResult) => {
+		// Ne pas scanner si un traitement est en cours (badge ou produit)
+		if (isBadgeProcessing || isProcessing) return;
+
+		if (isTracingEnabled && activeBadgeId === '') {
+			handleBadgeConnexion({ data } as BarcodeScanningResult);
+		} else {
+			handleBarcodeScanned({ data } as BarcodeScanningResult);
+		}
+	};
+
 	// Cleanup du timeout lors du démontage du composant
 	useEffect(() => {
 		return () => {
@@ -172,7 +206,7 @@ export default function Scanner() {
 			<CameraView
 				style={styles.camera}
 				barcodeScannerSettings={barcodeScannerSettings}
-				onBarcodeScanned={handleBarcodeScanned}
+				onBarcodeScanned={handleScan}
 			/>
 			{!isScanning && !isProcessing && (
 				<View style={styles.scannerDisabledOverlay}>
@@ -196,7 +230,7 @@ export default function Scanner() {
 				/>
 				<MouvementButton setMethod={handleMethodChange} />
 			</View>
-			<ScanLoader visible={isProcessing} />
+			<ScanLoader visible={isProcessing || isBadgeProcessing} />
 		</View>
 	);
 }

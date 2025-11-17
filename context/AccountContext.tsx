@@ -1,3 +1,4 @@
+import BadgeServices from '@/services/BadgeServices';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Account } from '../model/Account';
@@ -10,6 +11,9 @@ interface AccountContextType {
 	isLoading: boolean;
 	isTracingEnabled: boolean | undefined;
 	resetAccount: () => Promise<void>;
+	activeBadgeId: string;
+	activeBadgeName: string;
+	getBadge: (badge: string) => Promise<void>;
 }
 
 const AccountContext = createContext<AccountContextType | undefined>(undefined);
@@ -20,10 +24,15 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 	const [isTracingEnabled, setIsTracingEnabled] = useState<boolean>(true);
 	const [isLoading, setIsLoading] = useState(true);
 	const { isAuthenticated } = useAuth();
+	const [badgeConnected, setBadgeConnected] = useState(false);
+	const [activeBadgeId, setActiveBadgeId] = useState('');
+	const [activeBadgeName, setActiveBadgeName] = useState('');
+	const [activeBadgeScan, setActiveBadgeScan] = useState('');
 
 	useEffect(() => {
 		loadAccounts();
-	}, [isAuthenticated]);
+		loadBadge();
+	}, [isAuthenticated, badgeConnected]);
 
 	const loadAccounts = async () => {
 		try {
@@ -55,10 +64,49 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 		}
 	};
 
+	const getBadge = async (badge: string) => {
+		try {
+			setIsLoading(true);
+			const succes = await BadgeServices.getBadge(badge);
+			if (succes) {
+				setBadgeConnected(true);
+			}
+		} catch (error) {
+			if (__DEV__) {
+				console.error('Erreur connexion badge:', error);
+			}
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	const loadBadge = async () => {
+		try {
+			setIsLoading(true);
+			const badgeId = await AsyncStorage.getItem('badge_id');
+			const userName = await AsyncStorage.getItem('user_name');
+			const badgeScan = await AsyncStorage.getItem('badge-scan');
+
+			if (badgeId && userName && badgeScan) {
+				setActiveBadgeId(badgeId);
+				setActiveBadgeName(userName);
+				setActiveBadgeScan(badgeScan);
+			}
+		} catch (error) {
+			if (__DEV__) {
+				console.error('Erreur chargement comptes:', error);
+			}
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
 	const resetAccount = async () => {
 		setAccounts([]);
 		setActiveAccountState(null);
 		setIsTracingEnabled(false);
+		setActiveBadgeId('');
+		setActiveBadgeName('');
 	};
 
 	const setActiveAccount = async (account: Account) => {
@@ -72,7 +120,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 		}
 	};
 
-	return <AccountContext.Provider value={{ accounts, activeAccount, setActiveAccount, isLoading, isTracingEnabled, resetAccount }}>{children}</AccountContext.Provider>;
+	return <AccountContext.Provider value={{ accounts, activeAccount, setActiveAccount, isLoading, isTracingEnabled, resetAccount, activeBadgeId, activeBadgeName, getBadge }}>{children}</AccountContext.Provider>;
 }
 
 export function useAccount() {

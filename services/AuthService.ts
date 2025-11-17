@@ -266,7 +266,7 @@ class AuthService {
 			await SecureStorageService.clearTokens();
 
 			// Nettoyer les autres données du stockage local
-			await AsyncStorage.multiRemove(['catalogue', 'nb_account', 'activated_compte', 'lastConnection', 'first_connection', 'accountName', 'roles', 'licence', 'licenseType', 'proLink', 'tracingEnabled', 'Badge-Id']);
+			await AsyncStorage.multiRemove(['catalogue', 'nb_account', 'activated_compte', 'lastConnection', 'first_connection', 'accountName', 'roles', 'licence', 'licenseType', 'proLink', 'tracingEnabled', 'badge_id', 'user_name', 'badge-scan']);
 		} catch (error) {
 			console.error('Erreur lors de la déconnexion:', error);
 		}

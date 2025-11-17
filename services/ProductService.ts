@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AxiosErrorType } from '../model/ApiError';
 import { StatsResponse } from '../model/Stats';
 import { Method, StockModel } from '../model/Stock';
@@ -8,18 +7,8 @@ import ToastService from './ToastService';
 class ProductService {
 	async getStats() {
 		try {
-			// Récupérer le compte actif
-			const activeAccountString = await AsyncStorage.getItem('activated_compte');
-			if (!activeAccountString) {
-				throw new Error('Aucun compte actif trouvé');
-			}
-			const activeAccount = JSON.parse(activeAccountString);
-			// Appeler l'API avec le header Account-Id
-			const response = await apiClient.get<StatsResponse>('/statistics/stocks/last', {
-				headers: {
-					'Account-Id': activeAccount.id,
-				},
-			});
+			// L'Account-Id est automatiquement ajouté par l'intercepteur ApiService
+			const response = await apiClient.get<StatsResponse>('/statistics/stocks/last');
 			const statsList = response.data.content.slice(0, 3);
 
 			return statsList;
@@ -41,19 +30,9 @@ class ProductService {
 		const MAX_RETRIES = 2;
 
 		try {
-			const activeAccountString = await AsyncStorage.getItem('activated_compte');
-			if (!activeAccountString) {
-				throw new Error('Aucun compte actif trouvé');
-			}
-			const activeAccount = JSON.parse(activeAccountString);
-			// Appeler l'API avec le header Account-Id
-
+			// L'Account-Id est automatiquement ajouté par l'intercepteur ApiService
 			const stockModel = this.getStockModel(code, method);
-			const response = await apiClient.put<StockModel>('/product/stock', stockModel, {
-				headers: {
-					'Account-Id': activeAccount.id,
-				},
-			});
+			const response = await apiClient.put<StockModel>('/product/stock', stockModel);
 
 			// Afficher un message de succès
 			const actionText = method === Method.increase ? 'ajouté au stock' : 'retiré du stock';

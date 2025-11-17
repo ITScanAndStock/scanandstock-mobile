@@ -1,4 +1,5 @@
 // services/ApiService.ts
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { router } from 'expo-router';
 import { apiConfig } from '../config/KeycloakConfig';
@@ -19,6 +20,37 @@ apiClient.interceptors.request.use(
 
 		if (token) {
 			config.headers.Authorization = `Bearer ${token}`;
+		}
+
+		// Ajouter l'Account-Id à chaque requête
+		try {
+			const activeAccountString = await AsyncStorage.getItem('activated_compte');
+			if (activeAccountString) {
+				const activeAccount = JSON.parse(activeAccountString);
+				if (activeAccount?.id) {
+					config.headers['Account-Id'] = activeAccount.id;
+				}
+			}
+
+			// Ajouter le Badge-Id si isTracingEnabled est true
+			const tracingEnabledString = await AsyncStorage.getItem('tracingEnabled');
+			if (tracingEnabledString) {
+				const isTracingEnabled = JSON.parse(tracingEnabledString);
+				if (isTracingEnabled === true) {
+					const badgeScanString = await AsyncStorage.getItem('badge-scan');
+					if (badgeScanString) {
+						const badgeScan = JSON.parse(badgeScanString);
+						if (__DEV__) {
+							console.log('Badge-Id envoyé:', badgeScan);
+						}
+						config.headers['Badge-Id'] = badgeScan;
+					}
+				}
+			}
+		} catch (error) {
+			if (__DEV__) {
+				console.warn("⚠️ Impossible de récupérer l'Account-Id ou Badge-Id:", error);
+			}
 		}
 
 		return config;
