@@ -2,11 +2,17 @@
 
 Ce projet utilise des variables d'environnement pour gérer les différentes configurations (développement, staging, production).
 
+## Architecture
+
+L'application utilise `app.config.js` (au lieu de `app.json`) pour injecter dynamiquement les variables d'environnement dans le build. Les variables définies dans `eas.json` sont lues pendant le build et injectées dans `Constants.expoConfig.extra`.
+
 ## Fichiers d'environnement
 
 -   `.env.development` - Environnement de développement local (non commité)
 -   `.env.staging` - Environnement de staging (commité)
 -   `.env.production` - Environnement de production (commité)
+-   `app.config.js` - Configuration Expo qui injecte les variables d'environnement
+-   `eas.json` - Définit les variables pour chaque profil de build EAS
 
 ## Variables disponibles
 
@@ -37,18 +43,30 @@ npm start
 
 ## Utilisation avec EAS Build
 
-Les environnements sont automatiquement sélectionnés selon le profil de build :
+Les environnements sont automatiquement sélectionnés selon le profil de build défini dans `eas.json`. Les variables sont injectées via `app.config.js` dans l'application finale.
 
 ```bash
-# Development (utilise .env.development)
+# Development (utilise les variables du profil development dans eas.json)
 eas build --profile development
 
-# Staging (utilise .env.staging)
+# Staging (utilise les variables du profil preview dans eas.json)
 eas build --profile preview
 
-# Production (utilise .env.production)
+# Production (utilise les variables du profil production dans eas.json)
 eas build --profile production
 ```
+
+### Important pour les builds
+
+Les variables d'environnement doivent être définies dans **deux endroits** :
+
+1. Dans `eas.json` sous la clé `env` de chaque profil de build
+2. Dans les fichiers `.env.*` pour le développement local
+
+⚠️ **Si vous modifiez les URLs ou les configurations**, mettez à jour à la fois :
+
+-   Le fichier `.env.staging` ou `.env.production`
+-   La section `env` correspondante dans `eas.json`
 
 ## Accéder aux variables dans le code
 

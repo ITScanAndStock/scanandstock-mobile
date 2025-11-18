@@ -20,13 +20,25 @@
 			},
 			"channel": "preview",
 			"env": {
-				"EXPO_PUBLIC_ENV": "staging"
+				"EXPO_PUBLIC_ENV": "staging",
+				"EXPO_PUBLIC_KEYCLOAK_URL": "https://staging-sso.myscanandstock.fr/",
+				"EXPO_PUBLIC_KEYCLOAK_REALM": "scan-and-stock",
+				"EXPO_PUBLIC_KEYCLOAK_CLIENT_ID": "scanandstock-mobile",
+				"EXPO_PUBLIC_API_URL": "https://staging-api.myscanandstock.fr/api",
+				"EXPO_PUBLIC_COOMPY_URL": "https://staging-api.mycoompy.fr/api",
+				"EXPO_PUBLIC_MY_COOMPY_URL": "https://staging.mycoompy.fr"
 			}
 		},
 		"production": {
 			"autoIncrement": true,
 			"env": {
-				"EXPO_PUBLIC_ENV": "production"
+				"EXPO_PUBLIC_ENV": "production",
+				"EXPO_PUBLIC_KEYCLOAK_URL": "https://sso.myscanandstock.fr/",
+				"EXPO_PUBLIC_KEYCLOAK_REALM": "scan-and-stock",
+				"EXPO_PUBLIC_KEYCLOAK_CLIENT_ID": "scanandstock-mobile",
+				"EXPO_PUBLIC_API_URL": "https://api.myscanandstock.fr/api",
+				"EXPO_PUBLIC_COOMPY_URL": "https://api.mycoompy.fr/api",
+				"EXPO_PUBLIC_MY_COOMPY_URL": "https://mycoompy.fr"
 			}
 		}
 	},
