@@ -20,9 +20,7 @@ const getEnvVar = (key: string, defaultValue: string = ''): string => {
 		return constantValue;
 	}
 
-	if (!defaultValue) {
-		console.warn(`⚠️ Variable d'environnement ${key} non définie`);
-	}
+	console.warn(`⚠️ Variable d'environnement ${key} non définie, utilisation de la valeur par défaut: ${defaultValue}`);
 
 	return defaultValue;
 };
@@ -42,9 +40,10 @@ export const apiConfig = {
 // Exporter l'environnement actuel
 export const currentEnv = env;
 
-// Log pour debug (à retirer en production)
-if (__DEV__) {
-	console.log('🌍 Environment:', env);
-	console.log('🔧 Keycloak URL:', keycloakConfig.url);
-	console.log('🔧 API URL:', apiConfig.apiUrl);
-}
+// Log pour debug - TOUJOURS afficher en build preview/production pour diagnostiquer
+console.log('🌍 Environment:', env);
+console.log('🔧 Keycloak URL:', keycloakConfig.url);
+console.log('🔧 Keycloak Realm:', keycloakConfig.realm);
+console.log('🔧 Keycloak Client ID:', keycloakConfig.clientId);
+console.log('🔧 API URL:', apiConfig.apiUrl);
+console.log('🔧 Constants.expoConfig?.extra:', Constants.expoConfig?.extra);

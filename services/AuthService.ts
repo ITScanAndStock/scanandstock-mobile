@@ -148,11 +148,16 @@ class AuthService {
 	// Vérifier si le token est valide
 	async isTokenValid(): Promise<boolean> {
 		try {
+			console.log('🔍 AuthService - Vérification de la validité du token...');
 			// ✅ Récupérer les données de manière sécurisée
 			const tokenExpiry = await SecureStorageService.getItem('tokenExpiry');
 			const refreshToken = await SecureStorageService.getRefreshToken();
 
+			console.log('🔍 AuthService - tokenExpiry:', tokenExpiry ? 'présent' : 'absent');
+			console.log('🔍 AuthService - refreshToken:', refreshToken ? 'présent' : 'absent');
+
 			if (!tokenExpiry || !refreshToken) {
+				console.log('❌ AuthService - Pas de token ou expiry trouvé');
 				return false;
 			}
 
@@ -161,19 +166,27 @@ class AuthService {
 			const now = Date.now();
 			const fiveMinutes = 5 * 60 * 1000;
 
+			console.log('🔍 AuthService - Token expire dans:', Math.floor((expiryTime - now) / 1000), 'secondes');
+
 			if (expiryTime - now < fiveMinutes) {
 				// Token expire bientôt, le rafraîchir
 				try {
+					console.log('🔄 AuthService - Rafraîchissement du token...');
 					await this.refreshToken();
+					console.log('✅ AuthService - Token rafraîchi avec succès');
 					return true;
 				} catch (error) {
 					// Si le refresh échoue, retourner false
+					console.error('❌ AuthService - Échec du rafraîchissement:', error);
 					return false;
 				}
 			}
 
-			return expiryTime > now;
+			const isValid = expiryTime > now;
+			console.log('✅ AuthService - Token valide:', isValid);
+			return isValid;
 		} catch (error) {
+			console.error('❌ AuthService - Erreur isTokenValid:', error);
 			return false;
 		}
 	}

@@ -12,22 +12,17 @@ import { useAuth } from '../context/AuthContext';
 export default function RootNavigator() {
 	const { isAuthenticated, isLoading } = useAuth();
 
-	if (__DEV__) {
-		console.log('🔍 RootNavigator - isLoading:', isLoading, 'isAuthenticated:', isAuthenticated);
-	}
+	console.log('🔍 RootNavigator - isLoading:', isLoading, 'isAuthenticated:', isAuthenticated);
+
 	useEffect(() => {
 		if (!isLoading) {
-			if (__DEV__) {
-				console.log('🎨 Masquage du splash screen');
-			}
+			console.log('🎨 Masquage du splash screen');
 			SplashScreen.hideAsync();
 		}
 	}, [isLoading]);
 
 	if (isLoading) {
-		if (__DEV__) {
-			console.log('⏳ RootNavigator - Affichage du loader');
-		}
+		console.log('⏳ RootNavigator - Affichage du loader');
 		return (
 			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
 				<ActivityIndicator
@@ -38,9 +33,14 @@ export default function RootNavigator() {
 		);
 	}
 
+	console.log('🎯 RootNavigator - Affichage de la navigation, isAuthenticated:', isAuthenticated);
+
+	// 🔧 DEBUG: Force l'affichage de la page de login pour tester
+	const forceLoginPage = true;
+
 	return (
 		<Stack screenOptions={{ headerShown: false }}>
-			{isAuthenticated ? (
+			{(isAuthenticated && !forceLoginPage) ? (
 				<>
 					<Stack.Screen
 						name="(tabs)"

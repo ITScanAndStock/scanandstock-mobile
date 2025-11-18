@@ -19,12 +19,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 	const checkAuth = async () => {
 		try {
+			console.log('🔍 AuthContext - checkAuth appelé');
 			const isValid = await AuthService.isTokenValid();
+			console.log('🔍 AuthContext - Token valide:', isValid);
 			setIsAuthenticated(isValid);
 		} catch (error) {
-			if (__DEV__) {
-				console.error('❌ AuthContext - Erreur checkAuth:', error);
-			}
+			console.error('❌ AuthContext - Erreur checkAuth:', error);
 			setIsAuthenticated(false);
 		} finally {
 			setIsLoading(false);
@@ -34,13 +34,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 	useEffect(() => {
 		const initAuth = async () => {
 			try {
+				console.log("🚀 AuthContext - Initialisation de l'authentification...");
 				await checkAuth();
 			} catch (error) {
-				if (__DEV__) {
-					console.error('❌ Erreur initialisation auth:', error);
-				}
+				console.error('❌ Erreur initialisation auth:', error);
 			} finally {
 				setIsLoading(false); // Important: toujours passer à false
+				console.log('✅ AuthContext - Initialisation terminée');
 			}
 		};
 
@@ -49,9 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 	const login = async () => {
 		try {
-			if (__DEV__) {
-				console.log('🔐 AuthContext - Tentative de connexion...');
-			}
+			console.log('🔐 AuthContext - Tentative de connexion...');
 			setIsLoading(true);
 
 			// Appeler le service d'authentification
@@ -59,18 +57,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 			if (success) {
 				setIsAuthenticated(true);
+				console.log('✅ AuthContext - Connexion réussie');
 				ToastService.success('Connexion réussie', 'Bienvenue');
 			} else {
-				if (__DEV__) {
-					console.log('❌ AuthContext - Connexion échouée');
-				}
+				console.log('❌ AuthContext - Connexion échouée');
 				setIsAuthenticated(false);
 				ToastService.error('La connexion a échoué', 'Erreur de connexion');
 			}
 		} catch (error) {
-			if (__DEV__) {
-				console.error('❌ Erreur de connexion:', error);
-			}
+			console.error('❌ Erreur de connexion:', error);
 			setIsAuthenticated(false);
 			ToastService.error('Une erreur est survenue lors de la connexion', 'Erreur');
 		} finally {
