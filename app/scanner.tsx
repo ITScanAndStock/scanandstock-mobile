@@ -2,17 +2,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // import react native
-import { Button, StyleSheet, Text, Vibration, View } from 'react-native';
+import AntDesign from '@expo/vector-icons/AntDesign';
+import { Button, Dimensions, StyleSheet, Text, Vibration, View } from 'react-native';
+import Box from '../assets/images/box.svg';
+
+// Types
+type Point = { x: number; y: number };
 
 // import expo
 import { BarcodeScanningResult, BarcodeType, CameraView, useCameraPermissions } from 'expo-camera';
 
 // import components
-import Stat from '@/components/ui-components/Stat';
+import InformationBanner from '@/components/ui-components/InformationBanner';
+import { colors } from '@/constants/colors';
 import { useAccount } from '@/context/AccountContext';
 import { router } from 'expo-router';
 import GoBackHeader from '../components/GoBackHeader';
 import MouvementButton from '../components/MouvementButton';
+import ScanBadge from '../components/ScanBadge';
 import ScanLoader from '../components/ScanLoader';
 import { useStats } from '../hooks/useStats';
 import { Method } from '../model/Stock';
@@ -21,6 +28,32 @@ import ProductService from '../services/ProductService';
 export default function Scanner() {
 	const [permission, requestPermission] = useCameraPermissions();
 	const [isScanning, setIsScanning] = useState<boolean>(true);
+
+	// Configuration de la zone de scan
+	const screenWidth = Dimensions.get('window').width;
+	const screenHeight = Dimensions.get('window').height;
+	const scanBoxSize = 250;
+	const scannableArea = useMemo(
+		() => ({
+			x: (screenWidth - scanBoxSize) / 2,
+			y: (screenHeight - scanBoxSize) / 2,
+			width: scanBoxSize,
+			height: scanBoxSize,
+		}),
+		[screenWidth, screenHeight]
+	);
+
+	// Fonction pour vérifier si le code-barres est dans la zone de scan
+	const isWithinScannableArea = useCallback(
+		(cornerPoints: Point[]) => {
+			return cornerPoints.every((point) => {
+				const isWithinXRange = point.x >= scannableArea.x && point.x <= scannableArea.x + scannableArea.width;
+				const isWithinYRange = point.y >= scannableArea.y && point.y <= scannableArea.y + scannableArea.height;
+				return isWithinXRange && isWithinYRange;
+			});
+		},
+		[scannableArea]
+	);
 
 	// Mémoiser les types de codes-barres pour éviter de recréer le tableau à chaque render
 	const typeOfAcceptScan: BarcodeType[] = useMemo(() => ['qr', 'aztec', 'codabar', 'code128', 'code39', 'code93', 'datamatrix', 'ean13', 'ean8', 'itf14', 'pdf417', 'upc_a', 'upc_e'], []);
@@ -31,15 +64,32 @@ export default function Scanner() {
 	const [method, setMethod] = useState(Method.decrease);
 	const [isProcessing, setIsProcessing] = useState(false);
 	const [isBadgeProcessing, setIsBadgeProcessing] = useState(false);
+	const [showBanner, setShowBanner] = useState(false);
 	const { isTracingEnabled, activeBadgeId, activeBadgeName, getBadge } = useAccount();
 
 	// Utiliser useRef pour éviter de bloquer le scan pendant le traitement
 	const processingRef = useRef(false);
 	const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const bannerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
 	// Mémoiser le callback de changement de méthode
 	const handleMethodChange = useCallback((newMethod: Method) => {
 		setMethod(newMethod);
+
+		// Afficher la bannière si on passe en mode sortie de stock
+		if (newMethod === Method.decrease) {
+			setShowBanner(true);
+
+			// Masquer la bannière après 5 secondes
+			if (bannerTimeoutRef.current) {
+				clearTimeout(bannerTimeoutRef.current);
+			}
+			bannerTimeoutRef.current = setTimeout(() => {
+				setShowBanner(false);
+			}, 5000);
+		} else {
+			setShowBanner(false);
+		}
 	}, []);
 
 	const handleBadgeConnexion = async ({ data }: BarcodeScanningResult) => {
@@ -65,10 +115,22 @@ export default function Scanner() {
 
 	// Mémoiser le handler pour éviter les re-renders inutiles de CameraView
 	const handleBarcodeScanned = useCallback(
-		({ data }: BarcodeScanningResult) => {
+		(result: BarcodeScanningResult) => {
+			const { data, cornerPoints } = result;
+
 			// Ignorer si déjà en traitement ou scanner désactivé
 			if (!isScanning || !data || processingRef.current) {
 				return;
+			}
+
+			// Vérifier si le code-barres est dans la zone de scan
+			if (cornerPoints && cornerPoints.length > 0) {
+				if (!isWithinScannableArea(cornerPoints as Point[])) {
+					if (__DEV__) {
+						console.log('⚠️ Code-barres hors de la zone de scan');
+					}
+					return;
+				}
 			}
 
 			const cleanedCode = data.replace(/\x1D/g, '$'); // \x1D = caractère GS
@@ -142,7 +204,7 @@ export default function Scanner() {
 				}
 			}
 		},
-		[isScanning, scannedCode, scanCount, method, reloadStats]
+		[isScanning, scannedCode, scanCount, method, reloadStats, isWithinScannableArea]
 	);
 
 	// Mémoiser les settings du scanner
@@ -170,7 +232,20 @@ export default function Scanner() {
 			if (timeoutRef.current) {
 				clearTimeout(timeoutRef.current);
 			}
+			if (bannerTimeoutRef.current) {
+				clearTimeout(bannerTimeoutRef.current);
+			}
 		};
+	}, []);
+
+	// Afficher la bannière pendant 5 secondes au chargement si en mode sortie de stock
+	useEffect(() => {
+		if (method === Method.decrease) {
+			setShowBanner(true);
+			bannerTimeoutRef.current = setTimeout(() => {
+				setShowBanner(false);
+			}, 5000);
+		}
 	}, []);
 
 	// Rendu conditionnel après tous les hooks
@@ -210,26 +285,54 @@ export default function Scanner() {
 				barcodeScannerSettings={barcodeScannerSettings}
 				onBarcodeScanned={handleScan}
 			/>
+			{/* Overlay de zone de scan */}
+			<View style={styles.scanAreaOverlay}>
+				<View style={styles.scanAreaTop} />
+				<View style={styles.scanAreaMiddle}>
+					<View style={styles.scanAreaSide} />
+					<View style={styles.scanBox}>
+						<View style={[styles.corner, styles.cornerTopLeft]} />
+						<View style={[styles.corner, styles.cornerTopRight]} />
+						<View style={[styles.corner, styles.cornerBottomLeft]} />
+						<View style={[styles.corner, styles.cornerBottomRight]} />
+					</View>
+					<View style={styles.scanAreaSide} />
+				</View>
+				<View style={styles.scanAreaBottom} />
+			</View>
 			{!isScanning && !isProcessing && (
 				<View style={styles.scannerDisabledOverlay}>
 					<Text style={styles.scannerDisabledText}>Scanner temporairement désactivé...</Text>
 				</View>
 			)}
 			<GoBackHeader />
+			<View style={styles.banner}>{showBanner && method === Method.decrease ? <InformationBanner title="Attention la sortie de stock est activée" /> : isTracingEnabled && activeBadgeId !== '' ? <ScanBadge /> : null}</View>
 			<View style={styles.foot}>
-				<Stat
-					color="WHITE"
-					designation={stats?.[0]?.designation ?? ''}
-					type={stats?.[0]?.type ?? ''}
-					mvmtDateTime={''}
-					price={0}
-					provider={''}
-					quantity={0}
-					totalStock={0}
-					userEmail={''}
-					userName={''}
-					action={''}
-				/>
+				<View style={styles.stats}>
+					<View style={styles.text}>
+						{stats && stats.length > 0 && stats[0].type === 'increase' ? (
+							<AntDesign
+								name="arrow-up"
+								size={24}
+								color="green"
+								accessible={false}
+							/>
+						) : (
+							<AntDesign
+								name="arrow-down"
+								size={24}
+								color="red"
+								accessible={false}
+								style={{ margin: 0 }}
+							/>
+						)}
+						<Text style={{ fontFamily: 'SemiBold', color: colors.WHITE, fontSize: 16 }}>{stats && stats.length > 0 ? stats[0].designation : ''}</Text>
+					</View>
+					<View style={styles.text}>
+						<Box width={24} />
+						<Text style={{ fontFamily: 'Regular', color: colors.WHITE, fontSize: 15 }}>STOCK(S) : {stats && stats.length > 0 ? stats[0].totalStock : 0}</Text>
+					</View>
+				</View>
 				<MouvementButton setMethod={handleMethodChange} />
 			</View>
 			<ScanLoader visible={isProcessing || isBadgeProcessing} />
@@ -249,15 +352,18 @@ const styles = StyleSheet.create({
 	camera: {
 		flex: 1,
 	},
-	goBackContainer: {},
+	banner: { backgroundColor: 'transparent', position: 'absolute', top: 50, width: '100%' },
 	button: {
 		flex: 1,
 		alignItems: 'center',
 	},
 	text: {
-		fontSize: 24,
-		fontWeight: 'bold',
-		color: 'white',
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 10,
+	},
+	stats: {
+		gap: 5,
 	},
 	foot: {
 		width: '100%',
@@ -290,5 +396,64 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: 'bold',
 		textAlign: 'center',
+	},
+	scanAreaOverlay: {
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+	},
+	scanAreaTop: {
+		flex: 1,
+		backgroundColor: 'rgba(0, 0, 0, 0.5)',
+	},
+	scanAreaMiddle: {
+		flexDirection: 'row',
+		height: 250,
+	},
+	scanAreaSide: {
+		flex: 1,
+		backgroundColor: 'rgba(0, 0, 0, 0.5)',
+	},
+	scanBox: {
+		width: 250,
+		position: 'relative',
+		// borderWidth: 2,
+		// borderColor: 'rgba(255, 255, 255, 0.5)',
+	},
+	scanAreaBottom: {
+		flex: 1,
+		backgroundColor: 'rgba(0, 0, 0, 0.5)',
+	},
+	corner: {
+		position: 'absolute',
+		width: 30,
+		height: 30,
+		borderColor: colors.GREEN,
+	},
+	cornerTopLeft: {
+		top: -2,
+		left: -2,
+		borderTopWidth: 4,
+		borderLeftWidth: 4,
+	},
+	cornerTopRight: {
+		top: -2,
+		right: -2,
+		borderTopWidth: 4,
+		borderRightWidth: 4,
+	},
+	cornerBottomLeft: {
+		bottom: -2,
+		left: -2,
+		borderBottomWidth: 4,
+		borderLeftWidth: 4,
+	},
+	cornerBottomRight: {
+		bottom: -2,
+		right: -2,
+		borderBottomWidth: 4,
+		borderRightWidth: 4,
 	},
 });

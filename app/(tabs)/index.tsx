@@ -7,6 +7,7 @@ import { Link } from 'expo-router';
 
 // import svg and icons
 import Badge from '../../assets/images/badge.svg';
+import QrCode from '../../assets/images/qr-code.svg';
 import ScanLine from '../../assets/images/scan-line.svg';
 
 // import components
@@ -21,18 +22,31 @@ import { useAccount } from '../../context/AccountContext';
 import { useStats } from '../../hooks/useStats';
 
 export default function Scan() {
-	const { isTracingEnabled } = useAccount();
+	const { isTracingEnabled, activeBadgeId } = useAccount();
 	const { stats, isLoading } = useStats();
 
 	return (
 		<View style={styles.container}>
-			<Badge
-				style={styles.svg}
-				accessible={true}
-				accessibilityLabel="Badge ScanAndStock"
-				accessibilityRole="image"
-			/>
 			<ChoosAccount />
+			{activeBadgeId ? (
+				<QrCode
+					width={160}
+					height={160}
+					accessible={true}
+					accessibilityLabel="Badge ScanAndStock"
+					accessibilityRole="image"
+				/>
+			) : (
+				<Badge
+					width={160}
+					height={160}
+					style={styles.svg}
+					accessible={true}
+					accessibilityLabel="Badge ScanAndStock"
+					accessibilityRole="image"
+				/>
+			)}
+
 			{isTracingEnabled === true ? <ScanBadge /> : null}
 
 			<Link
@@ -93,8 +107,6 @@ export const styles = StyleSheet.create({
 		padding: 12,
 	},
 	svg: {
-		width: 160,
-		height: 160,
 		marginBottom: 10,
 	},
 	btn: {

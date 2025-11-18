@@ -16,6 +16,9 @@ export default function TabLayout() {
 	// import font familly and wait to it load
 	const [loaded, error] = useFonts({
 		Montserrat: require('../../assets/fonts/Montserrat-Regular.ttf'),
+		Medium: require('../../assets/fonts/Montserrat-Medium.ttf'),
+		SemiBold: require('../../assets/fonts/Montserrat-SemiBold.ttf'),
+		Light: require('../../assets/fonts/Montserrat-Light.ttf'),
 	});
 
 	useEffect(() => {
