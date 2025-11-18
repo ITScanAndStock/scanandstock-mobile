@@ -35,12 +35,9 @@ export default function RootNavigator() {
 
 	console.log('🎯 RootNavigator - Affichage de la navigation, isAuthenticated:', isAuthenticated);
 
-	// 🔧 DEBUG: Force l'affichage de la page de login pour tester
-	const forceLoginPage = true;
-
 	return (
 		<Stack screenOptions={{ headerShown: false }}>
-			{(isAuthenticated && !forceLoginPage) ? (
+			{isAuthenticated ? (
 				<>
 					<Stack.Screen
 						name="(tabs)"
