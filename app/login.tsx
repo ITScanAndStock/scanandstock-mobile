@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import React, { useEffect } from 'react';
+import React from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import LogoVertical from '../assets/images/logo-vertical.svg';
 import ThemedText from '../components/ui-components/ThemedText';
@@ -7,18 +7,16 @@ import { colors } from '../constants/colors';
 import { useAuth } from '../context/AuthContext';
 
 const LoginScreen = () => {
-	const { login, isLoading, isAuthenticated } = useAuth();
+	const { login, isLoading } = useAuth();
 	const router = useRouter();
-
-	useEffect(() => {
-		if (isAuthenticated) {
-			router.replace('/(tabs)');
-		}
-	}, [isAuthenticated]);
 
 	const handleLogin = async () => {
 		try {
-			await login();
+			const success = await login();
+			if (success) {
+				console.log('🚀 Login - Redirection vers (tabs)');
+				router.replace('/(tabs)');
+			}
 		} catch (error) {
 			if (__DEV__) {
 				console.error('❌ Erreur:', error);

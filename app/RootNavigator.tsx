@@ -24,10 +24,10 @@ export default function RootNavigator() {
 	if (isLoading) {
 		console.log('⏳ RootNavigator - Affichage du loader');
 		return (
-			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.WHITE }}>
 				<ActivityIndicator
 					size="large"
-					color={colors.GREY}
+					color={colors.DARK}
 				/>
 			</View>
 		);
@@ -36,35 +36,36 @@ export default function RootNavigator() {
 	console.log('🎯 RootNavigator - Affichage de la navigation, isAuthenticated:', isAuthenticated);
 
 	return (
-		<Stack screenOptions={{ headerShown: false }}>
-			<Stack.Screen name="index" />
-			{isAuthenticated ? (
-				<>
-					<Stack.Screen
-						name="(tabs)"
-						options={{
-							presentation: 'modal',
-							animationTypeForReplace: 'push',
-							animation: 'slide_from_left',
-						}}
-					/>
-					<Stack.Screen
-						name="scanner"
-						options={{
-							presentation: 'card',
-							animation: 'slide_from_right',
-						}}
-					/>
-				</>
-			) : (
-				<Stack.Screen
-					name="login"
-					options={{
-						presentation: 'card',
-						animation: 'slide_from_right',
-					}}
-				/>
-			)}
+		<Stack
+			screenOptions={{ headerShown: false }}
+			initialRouteName={isAuthenticated ? '(tabs)' : 'login'}
+		>
+			<Stack.Screen
+				name="index"
+				options={{ headerShown: false }}
+			/>
+			<Stack.Screen
+				name="login"
+				options={{
+					presentation: 'card',
+					animation: 'slide_from_right',
+				}}
+			/>
+			<Stack.Screen
+				name="(tabs)"
+				options={{
+					presentation: 'modal',
+					animationTypeForReplace: 'push',
+					animation: 'slide_from_left',
+				}}
+			/>
+			<Stack.Screen
+				name="scanner"
+				options={{
+					presentation: 'card',
+					animation: 'slide_from_right',
+				}}
+			/>
 		</Stack>
 	);
 }

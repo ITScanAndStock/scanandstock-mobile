@@ -6,7 +6,7 @@ import ToastService from '../services/ToastService';
 interface AuthContextData {
 	isAuthenticated: boolean;
 	isLoading: boolean;
-	login: () => Promise<void>;
+	login: () => Promise<boolean>;
 	logout: () => Promise<void>;
 	checkAuth: () => Promise<void>;
 }
@@ -47,7 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 		initAuth();
 	}, []);
 
-	const login = async () => {
+	const login = async (): Promise<boolean> => {
 		try {
 			console.log('🔐 AuthContext - Tentative de connexion...');
 			setIsLoading(true);
@@ -59,15 +59,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 				setIsAuthenticated(true);
 				console.log('✅ AuthContext - Connexion réussie');
 				ToastService.success('Connexion réussie', 'Bienvenue');
+				return true;
 			} else {
 				console.log('❌ AuthContext - Connexion échouée');
 				setIsAuthenticated(false);
 				ToastService.error('La connexion a échoué', 'Erreur de connexion');
+				return false;
 			}
 		} catch (error) {
 			console.error('❌ Erreur de connexion:', error);
 			setIsAuthenticated(false);
 			ToastService.error('Une erreur est survenue lors de la connexion', 'Erreur');
+			return false;
 		} finally {
 			setIsLoading(false);
 		}
