@@ -285,26 +285,7 @@ export default function Scanner() {
 				barcodeScannerSettings={barcodeScannerSettings}
 				onBarcodeScanned={handleScan}
 			/>
-			{/* Overlay de zone de scan */}
-			<View style={styles.scanAreaOverlay}>
-				<View style={styles.scanAreaTop} />
-				<View style={styles.scanAreaMiddle}>
-					<View style={styles.scanAreaSide} />
-					<View style={styles.scanBox}>
-						<View style={[styles.corner, styles.cornerTopLeft]} />
-						<View style={[styles.corner, styles.cornerTopRight]} />
-						<View style={[styles.corner, styles.cornerBottomLeft]} />
-						<View style={[styles.corner, styles.cornerBottomRight]} />
-					</View>
-					<View style={styles.scanAreaSide} />
-				</View>
-				<View style={styles.scanAreaBottom} />
-			</View>
-			{!isScanning && !isProcessing && (
-				<View style={styles.scannerDisabledOverlay}>
-					<Text style={styles.scannerDisabledText}>Scanner temporairement désactivé...</Text>
-				</View>
-			)}
+
 			<GoBackHeader />
 			<View style={styles.banner}>{showBanner && method === Method.decrease ? <InformationBanner title="Attention la sortie de stock est activée" /> : isTracingEnabled && activeBadgeId !== '' ? <ScanBadge /> : null}</View>
 			<View style={styles.foot}>

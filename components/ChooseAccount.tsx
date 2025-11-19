@@ -115,7 +115,7 @@ export default function ChoosAccount() {
 
 const styles = StyleSheet.create({
 	container: {
-		width: '50%',
+		minWidth: '50%',
 		backgroundColor: colors.DARK,
 		position: 'absolute',
 		top: 1,
@@ -141,5 +141,6 @@ const styles = StyleSheet.create({
 		padding: 10,
 		borderTopWidth: 1,
 		borderTopColor: 'rgba(255, 255, 255, 0.1)',
+		gap: 10,
 	},
 });

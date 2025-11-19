@@ -1,4 +1,5 @@
-import React from 'react';
+import { useRouter } from 'expo-router';
+import React, { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import LogoVertical from '../assets/images/logo-vertical.svg';
 import ThemedText from '../components/ui-components/ThemedText';
@@ -6,7 +7,14 @@ import { colors } from '../constants/colors';
 import { useAuth } from '../context/AuthContext';
 
 const LoginScreen = () => {
-	const { login, isLoading } = useAuth();
+	const { login, isLoading, isAuthenticated } = useAuth();
+	const router = useRouter();
+
+	useEffect(() => {
+		if (isAuthenticated) {
+			router.replace('/(tabs)');
+		}
+	}, [isAuthenticated]);
 
 	const handleLogin = async () => {
 		try {

@@ -21,7 +21,10 @@ class AuthService {
 		try {
 			const redirectUri = AuthSession.makeRedirectUri({
 				scheme: 'scanandstock',
+				path: 'login',
 			});
+
+			console.log('🔗 Redirect URI:', redirectUri);
 
 			const authRequest = new AuthSession.AuthRequest({
 				clientId: keycloakConfig.clientId,
