@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // import react native
 import AntDesign from '@expo/vector-icons/AntDesign';
-import { Button, Dimensions, StyleSheet, Text, Vibration, View } from 'react-native';
+import { Button, StyleSheet, Text, Vibration, View } from 'react-native';
 import Box from '../assets/images/box.svg';
 
 // Types
@@ -16,6 +16,7 @@ import { BarcodeScanningResult, BarcodeType, CameraView, useCameraPermissions } 
 import InformationBanner from '@/components/ui-components/InformationBanner';
 import { colors } from '@/constants/colors';
 import { useAccount } from '@/context/AccountContext';
+import { useAudioPlayer } from 'expo-audio';
 import { router } from 'expo-router';
 import GoBackHeader from '../components/GoBackHeader';
 import MouvementButton from '../components/MouvementButton';
@@ -25,37 +26,16 @@ import { useStats } from '../hooks/useStats';
 import { Method } from '../model/Stock';
 import ProductService from '../services/ProductService';
 
+const audioSourceSucces = require('../assets/sounds/ok.mp3');
+const audioSourceError = require('../assets/sounds/error.mp3');
+
 export default function Scanner() {
 	const [permission, requestPermission] = useCameraPermissions();
 	const [isScanning, setIsScanning] = useState<boolean>(true);
 
-	// Configuration de la zone de scan
-	const screenWidth = Dimensions.get('window').width;
-	const screenHeight = Dimensions.get('window').height;
-	const scanBoxSize = 250;
-	const scannableArea = useMemo(
-		() => ({
-			x: (screenWidth - scanBoxSize) / 2,
-			y: (screenHeight - scanBoxSize) / 2,
-			width: scanBoxSize,
-			height: scanBoxSize,
-		}),
-		[screenWidth, screenHeight]
-	);
+	const playerSuccess = useAudioPlayer(audioSourceSucces);
+	const playerError = useAudioPlayer(audioSourceError);
 
-	// Fonction pour vérifier si le code-barres est dans la zone de scan
-	const isWithinScannableArea = useCallback(
-		(cornerPoints: Point[]) => {
-			return cornerPoints.every((point) => {
-				const isWithinXRange = point.x >= scannableArea.x && point.x <= scannableArea.x + scannableArea.width;
-				const isWithinYRange = point.y >= scannableArea.y && point.y <= scannableArea.y + scannableArea.height;
-				return isWithinXRange && isWithinYRange;
-			});
-		},
-		[scannableArea]
-	);
-
-	// Mémoiser les types de codes-barres pour éviter de recréer le tableau à chaque render
 	const typeOfAcceptScan: BarcodeType[] = useMemo(() => ['qr', 'aztec', 'codabar', 'code128', 'code39', 'code93', 'datamatrix', 'ean13', 'ean8', 'itf14', 'pdf417', 'upc_a', 'upc_e'], []);
 
 	const { reload: reloadStats, stats } = useStats();
@@ -65,7 +45,7 @@ export default function Scanner() {
 	const [isProcessing, setIsProcessing] = useState(false);
 	const [isBadgeProcessing, setIsBadgeProcessing] = useState(false);
 	const [showBanner, setShowBanner] = useState(false);
-	const { isTracingEnabled, activeBadgeId, activeBadgeName, getBadge } = useAccount();
+	const { isTracingEnabled, activeBadgeId, getBadge } = useAccount();
 
 	// Utiliser useRef pour éviter de bloquer le scan pendant le traitement
 	const processingRef = useRef(false);
@@ -97,15 +77,17 @@ export default function Scanner() {
 
 		setIsBadgeProcessing(true);
 		setIsScanning(false);
-
+		Vibration.vibrate(100);
 		try {
 			await getBadge(data);
-			// Vibration à la validation
-			Vibration.vibrate(100);
+			playerSuccess.seekTo(0);
+			playerSuccess.play();
 		} catch (error) {
 			if (__DEV__) {
 				console.error('❌ Erreur lors du scan du badge:', error);
 			}
+			playerError.seekTo(0);
+			playerError.play();
 		} finally {
 			setIsBadgeProcessing(false);
 			setIsScanning(true);
@@ -116,21 +98,11 @@ export default function Scanner() {
 	// Mémoiser le handler pour éviter les re-renders inutiles de CameraView
 	const handleBarcodeScanned = useCallback(
 		(result: BarcodeScanningResult) => {
-			const { data, cornerPoints } = result;
+			const { data } = result;
 
 			// Ignorer si déjà en traitement ou scanner désactivé
 			if (!isScanning || !data || processingRef.current) {
 				return;
-			}
-
-			// Vérifier si le code-barres est dans la zone de scan
-			if (cornerPoints && cornerPoints.length > 0) {
-				if (!isWithinScannableArea(cornerPoints as Point[])) {
-					if (__DEV__) {
-						console.log('⚠️ Code-barres hors de la zone de scan');
-					}
-					return;
-				}
 			}
 
 			const cleanedCode = data.replace(/\x1D/g, '$'); // \x1D = caractère GS
@@ -176,11 +148,15 @@ export default function Scanner() {
 						.then(() => {
 							// Recharger les stats en arrière-plan
 							reloadStats();
+							playerSuccess.seekTo(0);
+							playerSuccess.play();
 						})
 						.catch((error) => {
 							if (__DEV__) {
 								console.error('❌ Erreur lors du scan:', error);
 							}
+							playerError.seekTo(0);
+							playerError.play();
 						})
 						.finally(() => {
 							setIsProcessing(false);
@@ -197,14 +173,14 @@ export default function Scanner() {
 					}
 					timeoutRef.current = setTimeout(() => {
 						setIsScanning(true);
-					}, 1500); // Réduit de 2000ms à 1500ms
+					}, 2000);
 				} else {
 					// Incrémenter le compteur
 					setScanCount((prev) => prev + 1);
 				}
 			}
 		},
-		[isScanning, scannedCode, scanCount, method, reloadStats, isWithinScannableArea]
+		[isScanning, scannedCode, scanCount, method, reloadStats]
 	);
 
 	// Mémoiser les settings du scanner
@@ -285,7 +261,6 @@ export default function Scanner() {
 				barcodeScannerSettings={barcodeScannerSettings}
 				onBarcodeScanned={handleScan}
 			/>
-
 			<GoBackHeader />
 			<View style={styles.banner}>{showBanner && method === Method.decrease ? <InformationBanner title="Attention la sortie de stock est activée" /> : isTracingEnabled && activeBadgeId !== '' ? <ScanBadge /> : null}</View>
 			<View style={styles.foot}>

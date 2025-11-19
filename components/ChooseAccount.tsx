@@ -141,6 +141,6 @@ const styles = StyleSheet.create({
 		padding: 10,
 		borderTopWidth: 1,
 		borderTopColor: 'rgba(255, 255, 255, 0.1)',
-		gap: 10,
+		gap: 20,
 	},
 });

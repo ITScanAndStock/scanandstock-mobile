@@ -32,11 +32,13 @@ class ProductService {
 		try {
 			// L'Account-Id est automatiquement ajouté par l'intercepteur ApiService
 			const stockModel = this.getStockModel(code, method);
-			const response = await apiClient.put<StockModel>('/product/stock', stockModel);
+			const response = await apiClient.put<any>('/product/stock', stockModel);
+
+			console.log('response.data', response.data);
 
 			// Afficher un message de succès
-			const actionText = method === Method.increase ? 'ajouté au stock' : 'retiré du stock';
-			ToastService.success(`Produit ${actionText}`, 'Succès');
+			const message = response.data.message.split('<br/>');
+			ToastService.success(message[0], 'Succès');
 
 			return response.data;
 		} catch (error) {
@@ -60,7 +62,7 @@ class ProductService {
 				console.error('URL:', axiosError.config?.url);
 			}
 
-			const errorMessage = axiosError.response?.data?.message || 'Erreur lors du scan du produit';
+			const errorMessage = axiosError.response?.data?.errorMessage || 'Erreur lors du scan du produit';
 			ToastService.error(errorMessage);
 			throw error;
 		}

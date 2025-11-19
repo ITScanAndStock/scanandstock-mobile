@@ -16,7 +16,7 @@ export default function ScanLoader({ visible }: ScanLoaderProps) {
 			<View style={styles.container}>
 				<ActivityIndicator
 					size="large"
-					color={colors.DARK}
+					color={colors.WHITE}
 				/>
 				<ThemedText
 					variant="regularText"
@@ -51,5 +51,6 @@ const styles = StyleSheet.create({
 	},
 	text: {
 		marginTop: 10,
+		color: colors.WHITE,
 	},
 });
