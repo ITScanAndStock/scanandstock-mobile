@@ -25,7 +25,7 @@ export default {
 		slug: 'scanandstock',
 		version: '1.0.0',
 		orientation: 'portrait',
-		icon: './assets/images/icon.png',
+		icon: './assets/images/splash-icon.png',
 		scheme: 'scanandstock',
 		userInterfaceStyle: 'automatic',
 		newArchEnabled: true,
@@ -35,10 +35,10 @@ export default {
 		},
 		android: {
 			adaptiveIcon: {
-				backgroundColor: '#E6F4FE',
-				foregroundImage: './assets/images/android-icon-foreground.png',
-				backgroundImage: './assets/images/android-icon-background.png',
-				monochromeImage: './assets/images/android-icon-monochrome.png',
+				// backgroundColor: '#E6F4FE',
+				foregroundImage: './assets/images/adaptive-icon.png',
+				// backgroundImage: './assets/images/splash-icon.png',
+				monochromeImage: './assets/images/adaptive-icon.png',
 			},
 			edgeToEdgeEnabled: true,
 			package: 'com.scanandstock.scanandstock',
@@ -74,12 +74,8 @@ export default {
 				'expo-splash-screen',
 				{
 					image: './assets/images/splash-icon.png',
-					imageWidth: 200,
 					resizeMode: 'contain',
 					backgroundColor: '#ffffff',
-					dark: {
-						backgroundColor: '#000000',
-					},
 				},
 			],
 			[

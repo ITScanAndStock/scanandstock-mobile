@@ -1,5 +1,5 @@
 // import React native
-import React from 'react'; // Ajout de l'import React manquant
+import React, { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 
 // import components
+import CustomSplashScreen from '../components/CustomSplashScreen';
 import Header from '../components/Header';
 import { AccountProvider } from '../context/AccountContext';
 import { AuthProvider, useAuth } from '../context/AuthContext';
@@ -20,6 +21,23 @@ SplashScreen.preventAutoHideAsync();
 
 function RootLayoutContent() {
 	const { isAuthenticated } = useAuth();
+	const [appIsReady, setAppIsReady] = useState(false);
+
+	useEffect(() => {
+		const prepare = async () => {
+			try {
+				// Ajoutez ici vos opérations de chargement (fonts, données, etc.)
+				await new Promise((resolve) => setTimeout(resolve, 1000));
+			} catch (e) {
+				console.warn(e);
+			} finally {
+				setAppIsReady(true);
+				SplashScreen.hideAsync();
+			}
+		};
+
+		prepare();
+	}, []);
 
 	return (
 		<SafeAreaView style={styles.container}>
