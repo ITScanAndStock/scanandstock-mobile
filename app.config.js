@@ -31,7 +31,7 @@ export default {
 		newArchEnabled: true,
 		ios: {
 			supportsTablet: true,
-			bundleIdentifier: 'com.scanandstock.scanandstock',
+			bundleIdentifier: 'com.robinfantino.scanandstock', // Changez selon votre nom
 		},
 		android: {
 			adaptiveIcon: {
@@ -70,6 +70,14 @@ export default {
 		},
 		plugins: [
 			'expo-router',
+			[
+				'expo-camera',
+				{
+					cameraPermission: 'Allow $(PRODUCT_NAME) to access your camera',
+					microphonePermission: 'Allow $(PRODUCT_NAME) to access your microphone',
+					recordAudioAndroid: true,
+				},
+			],
 			[
 				'expo-splash-screen',
 				{

@@ -119,7 +119,10 @@ export const styles = StyleSheet.create({
 		textAlign: 'center',
 	},
 	btnContent: {
+		width: '100%',
 		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
 		gap: 10,
 	},
 	historyContainer: {

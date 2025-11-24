@@ -1,9 +1,6 @@
 // import react native
 import { Pressable, StyleSheet, View } from 'react-native';
 
-// import expo
-import { Link } from 'expo-router';
-
 // import svg and icons
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 
@@ -25,19 +22,12 @@ export default function Header() {
 
 	return (
 		<View style={styles.container}>
-			<Link
-				style={styles.link}
-				href={'/'}
-				accessible={true}
-				accessibilityLabel="Accueil"
-				accessibilityRole="link"
-				accessibilityHint="Retourner à la page d'accueil"
-			>
-				<Logo
-					width={120}
-					accessible={false}
-				/>
-			</Link>
+			<Logo
+				width={120}
+				height={60}
+				accessible={false}
+			/>
+
 			<Pressable
 				onPress={handleLogout}
 				accessible={true}
@@ -65,9 +55,6 @@ export const styles = StyleSheet.create({
 		alignItems: 'center',
 		paddingVertical: 6,
 		paddingHorizontal: 12,
-	},
-	link: {
-		height: 60,
 	},
 	img: {
 		width: 120,
