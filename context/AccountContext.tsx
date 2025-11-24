@@ -2,6 +2,7 @@ import BadgeServices from '@/services/BadgeServices';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Account } from '../model/Account';
+import HeaderStore from '../state/HeaderStore';
 import { useAuth } from './AuthContext';
 
 interface AccountContextType {
@@ -50,11 +51,17 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 			if (activeAccountString) {
 				const parsedActiveAccount = JSON.parse(activeAccountString);
 				setActiveAccountState(parsedActiveAccount);
+				HeaderStore.setAccountId(parsedActiveAccount?.id);
+			} else {
+				HeaderStore.setAccountId(undefined);
 			}
 
 			if (tracingEnabled) {
 				const parsedTracingEnabled = JSON.parse(tracingEnabled);
 				setIsTracingEnabled(parsedTracingEnabled);
+				HeaderStore.setTracingEnabled(parsedTracingEnabled);
+			} else {
+				HeaderStore.setTracingEnabled(undefined);
 			}
 		} catch (error) {
 			if (__DEV__) {
@@ -89,9 +96,15 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 			const badgeScan = await AsyncStorage.getItem('badge-scan');
 
 			if (badgeId && userName && badgeScan) {
-				setActiveBadgeId(badgeId);
-				setActiveBadgeName(JSON.parse(userName));
-				setActiveBadgeScan(badgeScan);
+				const parsedBadgeScan = String(JSON.parse(badgeScan));
+				const parsedBadgeId = String(JSON.parse(badgeId));
+				const parsedUserName = String(JSON.parse(userName));
+				setActiveBadgeId(parsedBadgeId);
+				setActiveBadgeName(parsedUserName);
+				setActiveBadgeScan(parsedBadgeScan);
+				HeaderStore.setBadgeScan(parsedBadgeScan);
+			} else {
+				HeaderStore.setBadgeScan(undefined);
 			}
 		} catch (error) {
 			if (__DEV__) {
@@ -114,6 +127,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 			setActiveBadgeName('');
 			setActiveBadgeScan('');
 			setBadgeConnected(false);
+			HeaderStore.setBadgeScan(undefined);
 
 			if (__DEV__) {
 				console.log('✅ Badge déconnecté');
@@ -131,12 +145,15 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 		setIsTracingEnabled(false);
 		setActiveBadgeId('');
 		setActiveBadgeName('');
+		setActiveBadgeScan('');
+		HeaderStore.reset();
 	};
 
 	const setActiveAccount = async (account: Account) => {
 		try {
 			await AsyncStorage.setItem('activated_compte', JSON.stringify(account));
 			setActiveAccountState(account);
+			HeaderStore.setAccountId(account.id);
 		} catch (error) {
 			if (__DEV__) {
 				console.error('Erreur sauvegarde compte actif:', error);

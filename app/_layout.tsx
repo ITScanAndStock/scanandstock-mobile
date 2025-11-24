@@ -15,6 +15,7 @@ import CustomSplashScreen from '../components/CustomSplashScreen';
 import Header from '../components/Header';
 import { AccountProvider } from '../context/AccountContext';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { StatsProvider } from '../context/StatsContext';
 import RootNavigator from './RootNavigator';
 
 // Empêcher le splash screen de se cacher automatiquement
@@ -59,7 +60,9 @@ export default function RootLayout() {
 	return (
 		<AuthProvider>
 			<AccountProvider>
-				<RootLayoutContent />
+				<StatsProvider>
+					<RootLayoutContent />
+				</StatsProvider>
 			</AccountProvider>
 		</AuthProvider>
 	);

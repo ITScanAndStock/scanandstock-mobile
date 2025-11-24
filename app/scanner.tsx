@@ -38,7 +38,7 @@ export default function Scanner() {
 
 	const typeOfAcceptScan: BarcodeType[] = useMemo(() => ['qr', 'aztec', 'codabar', 'code128', 'code39', 'code93', 'datamatrix', 'ean13', 'ean8', 'itf14', 'pdf417', 'upc_a', 'upc_e'], []);
 
-	const { reload: reloadStats, stats } = useStats();
+	const { refresh: refreshStats, stats } = useStats();
 	const [scannedCode, setScannedCode] = useState('');
 	const [scanCount, setScanCount] = useState(0);
 	const [method, setMethod] = useState(Method.decrease);
@@ -147,7 +147,7 @@ export default function Scanner() {
 					ProductService.scan(cleanedCode, method)
 						.then(() => {
 							// Recharger les stats en arrière-plan
-							reloadStats();
+							refreshStats();
 							playerSuccess.seekTo(0);
 							playerSuccess.play();
 						})
@@ -180,7 +180,7 @@ export default function Scanner() {
 				}
 			}
 		},
-		[isScanning, scannedCode, scanCount, method, reloadStats]
+		[isScanning, scannedCode, scanCount, method, refreshStats]
 	);
 
 	// Mémoiser les settings du scanner
