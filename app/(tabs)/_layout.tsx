@@ -1,10 +1,5 @@
-// import react
-import { useEffect } from 'react';
-
 // import expo
-import { useFonts } from 'expo-font';
 import { Tabs } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
 
 // import svg and icons
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -13,24 +8,6 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors } from '../../constants/colors';
 
 export default function TabLayout() {
-	// import font familly and wait to it load
-	const [loaded, error] = useFonts({
-		Montserrat: require('../../assets/fonts/Montserrat-Regular.ttf'),
-		Medium: require('../../assets/fonts/Montserrat-Medium.ttf'),
-		SemiBold: require('../../assets/fonts/Montserrat-SemiBold.ttf'),
-		Light: require('../../assets/fonts/Montserrat-Light.ttf'),
-	});
-
-	useEffect(() => {
-		if (loaded || error) {
-			SplashScreen.hideAsync();
-		}
-	}, [loaded, error]);
-
-	if (!loaded && !error) {
-		return null;
-	}
-
 	return (
 		<Tabs
 			screenOptions={{

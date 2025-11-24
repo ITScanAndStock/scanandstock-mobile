@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
 // import expo
+import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 
@@ -20,24 +21,29 @@ import RootNavigator from './RootNavigator';
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutContent() {
-	const { isAuthenticated } = useAuth();
+	const { isAuthenticated, isLoading } = useAuth();
 	const [appIsReady, setAppIsReady] = useState(false);
+	const [fontsLoaded, fontsError] = useFonts({
+		Montserrat: require('../assets/fonts/Montserrat-Regular.ttf'),
+		Medium: require('../assets/fonts/Montserrat-Medium.ttf'),
+		SemiBold: require('../assets/fonts/Montserrat-SemiBold.ttf'),
+		Light: require('../assets/fonts/Montserrat-Light.ttf'),
+	});
 
 	useEffect(() => {
-		const prepare = async () => {
-			try {
-				// Ajoutez ici vos opérations de chargement (fonts, données, etc.)
-				await new Promise((resolve) => setTimeout(resolve, 1000));
-			} catch (e) {
-				console.warn(e);
-			} finally {
-				setAppIsReady(true);
-				SplashScreen.hideAsync();
-			}
-		};
+		if (fontsError) {
+			console.warn('Erreur chargement polices:', fontsError);
+		}
 
-		prepare();
-	}, []);
+		if ((fontsLoaded || fontsError) && !isLoading) {
+			setAppIsReady(true);
+			void SplashScreen.hideAsync();
+		}
+	}, [fontsLoaded, fontsError, isLoading]);
+
+	if (!appIsReady) {
+		return <CustomSplashScreen />;
+	}
 
 	return (
 		<SafeAreaView style={styles.container}>
