@@ -115,15 +115,6 @@ export default function Scanner() {
 				return;
 			}
 
-			// Vérifier que le code contient des caractères valides
-			const validCodePattern = /^[A-Za-z0-9$\-_.+!*'(),]+$/;
-			if (!validCodePattern.test(cleanedCode)) {
-				if (__DEV__) {
-					console.warn('⚠️ Code-barres invalide (caractères):', cleanedCode);
-				}
-				return;
-			}
-
 			// 1. Si c'est un nouveau code différent du précédent
 			if (cleanedCode !== scannedCode) {
 				setScannedCode(cleanedCode);
