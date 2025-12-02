@@ -3,8 +3,8 @@ import React from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import LogoVertical from '../assets/images/logo-vertical.svg';
 import ThemedText from '../components/ui-components/ThemedText';
-import { colors } from '../constants/colors';
-import { useAuth } from '../context/AuthContext';
+import { colors } from '@/constants/colors';
+import { useAuth } from '@/context/AuthContext';
 
 const LoginScreen = () => {
 	const { login, isLoading } = useAuth();

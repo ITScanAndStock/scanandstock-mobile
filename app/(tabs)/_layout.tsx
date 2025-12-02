@@ -4,8 +4,8 @@ import { Tabs } from 'expo-router';
 // import svg and icons
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
-// import contants
-import { colors } from '../../constants/colors';
+// import constants
+import { colors } from '@/constants/colors';
 
 export default function TabLayout() {
 	return (

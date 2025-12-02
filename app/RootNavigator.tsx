@@ -5,8 +5,8 @@ import 'react-native-reanimated';
 // import expo
 import { Stack } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
-import { colors } from '../constants/colors';
-import { useAuth } from '../context/AuthContext';
+import { colors } from '@/constants/colors';
+import { useAuth } from '@/context/AuthContext';
 
 function AuthStack() {
 	return (

@@ -1,4 +1,4 @@
-// import react native
+// import reacts native
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 // import expo
@@ -17,9 +17,9 @@ import ThemedText from '../../components/ui-components/ThemedText';
 
 // importe constants
 import Stat from '../../components/ui-components/Stat';
-import { colors } from '../../constants/colors';
-import { useAccount } from '../../context/AccountContext';
-import { useStats } from '../../hooks/useStats';
+import { colors } from '@/constants/colors';
+import { useAccount } from '@/context/AccountContext';
+import { useStats } from '@/hooks/useStats';
 
 export default function Scan() {
 	const { isTracingEnabled, activeBadgeId } = useAccount();
