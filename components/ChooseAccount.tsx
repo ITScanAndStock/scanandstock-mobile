@@ -125,6 +125,7 @@ const styles = StyleSheet.create({
   mainBtn: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
     padding: 8,
   },
   dropdownContainer: {
@@ -133,10 +134,13 @@ const styles = StyleSheet.create({
   },
   text: {
     color: colors.WHITE,
+    fontSize: 14,
+    fontFamily: "SemiBold",
   },
   items: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
     padding: 10,
     borderTopWidth: 1,
     borderTopColor: "rgba(255, 255, 255, 0.1)",
