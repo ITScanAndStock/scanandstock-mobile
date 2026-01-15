@@ -31,9 +31,10 @@ export default {
 		newArchEnabled: true,
 		ios: {
 			supportsTablet: true,
-			bundleIdentifier: 'com.robinfantino.scanandstock', // Changez selon votre nom
+			bundleIdentifier: 'com.scanandstock.mobile', // Changez selon votre nom
 		},
 		android: {
+			package: "com.scanandstock.mobile",
 			adaptiveIcon: {
 				// backgroundColor: '#E6F4FE',
 				foregroundImage: './assets/images/adaptive-icon.png',

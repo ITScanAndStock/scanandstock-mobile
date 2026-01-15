@@ -1,6 +1,6 @@
 // import React native
+import { colors } from '@/constants/colors';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors } from '../../constants/colors';
 
 export default function Profile() {
 	return (

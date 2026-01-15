@@ -11,14 +11,13 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 
 // import components
-import CustomSplashScreen from '../components/CustomSplashScreen';
-import Header from '../components/Header';
 import { AccountProvider } from '@/context/AccountContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { StatsProvider } from '@/context/StatsContext';
+import CustomSplashScreen from '../components/CustomSplashScreen';
+import Header from '../components/Header';
 import RootNavigator from './RootNavigator';
 
-// Empêcher le splash screen de se cacher automatiquement
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutContent() {

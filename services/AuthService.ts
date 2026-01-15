@@ -88,7 +88,7 @@ class AuthService {
     if (tokenResponse.refreshToken) {
       await SecureStorageService.setRefreshToken(tokenResponse.refreshToken);
     }
-    const expiresIn = tokenResponse.expiresIn || 3600; // Par défaut 1 heure
+    const expiresIn = tokenResponse.expiresIn || 300; // Par défaut 1 heure
     await SecureStorageService.setItem(
       "tokenExpiry",
       String(Date.now() + expiresIn * 1000)
