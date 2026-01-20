@@ -18,7 +18,7 @@ class AuthService {
   };
 
   // Créer la requête d'authentification
-  async login() {
+  async login(forceLogin: boolean = false) {
     try {
       const redirectUri = AuthSession.makeRedirectUri({
         scheme: "scanandstock",
@@ -30,10 +30,16 @@ class AuthService {
         redirectUri,
         scopes: ["openid", "profile", "email"],
         responseType: AuthSession.ResponseType.Code,
-        usePKCE: true, // ✅ Active PKCE
+        usePKCE: true,
+        prompt: forceLogin ? AuthSession.Prompt.Login : undefined,
+        // ✅ Ajouter max_age=0 pour forcer une nouvelle authentification sur Android
+        extraParams: forceLogin ? { max_age: "0" } : undefined,
       });
 
-      const result = await authRequest.promptAsync(this.discovery);
+      // ✅ Ajouter preferEphemeralSession pour iOS
+      const result = await authRequest.promptAsync(this.discovery, {
+        preferEphemeralSession: true, // ✅ Évite la popup de confirmation sur iOS
+      });
 
       if (result.type === "success") {
         const { code } = result.params;
@@ -297,42 +303,38 @@ class AuthService {
   // Déconnexion
   async logout() {
     try {
-      // ✅ Récupérer le token de manière sécurisée
-      const token = await SecureStorageService.getToken();
       const refreshToken = await SecureStorageService.getRefreshToken();
 
-      if (token && refreshToken) {
-        // ✅ 1. Révoquer le refresh token
-        await fetch(this.discovery.revocationEndpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: new URLSearchParams({
-            client_id: keycloakConfig.clientId,
-            token: refreshToken,
-            token_type_hint: "refresh_token",
-          }).toString(),
-        });
-
-        // ✅ 2. Logout OIDC avec redirection
-        const redirectUri = AuthSession.makeRedirectUri({
-          scheme: "scanandstock",
-          path: "logout",
-        });
-
-        const logoutUrl =
-          `${this.discovery.endSessionEndpoint}?` +
-          `client_id=${keycloakConfig.clientId}&` +
-          `post_logout_redirect_uri=${encodeURIComponent(redirectUri)}`;
-
-        await WebBrowser.openAuthSessionAsync(logoutUrl, redirectUri);
+      // ✅ Révoquer le token côté serveur (sans ouvrir de navigateur)
+      if (refreshToken) {
+        try {
+          await fetch(this.discovery.revocationEndpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+              client_id: keycloakConfig.clientId,
+              token: refreshToken,
+              token_type_hint: "refresh_token",
+            }).toString(),
+          });
+        } catch (error) {
+          // Ignorer les erreurs de révocation
+          console.warn("Erreur lors de la révocation du token:", error);
+        }
       }
 
-      // Nettoyer les autres données du stockage local
+      // ✅ Nettoyer toutes les données locales
+      await SecureStorageService.removeItem("token");
+      await SecureStorageService.removeItem("refreshToken");
+      await SecureStorageService.removeItem("id_tokent");
+      await SecureStorageService.removeItem("tokenExpiry");
+
       await AsyncStorage.multiRemove([
         "catalogue",
         "nb_account",
+        "account",
         "activated_compte",
         "lastConnection",
         "first_connection",
