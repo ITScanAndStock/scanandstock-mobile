@@ -42,9 +42,14 @@ export default {
       supportsTablet: true,
       bundleIdentifier: "com.scanandstock.mobile",
       icon: "./assets/images/ios-app-icon.png",
+      infoPlist: {
+        NSCameraUsageDescription:
+          "Allow $(PRODUCT_NAME) to access your camera to scan barcodes and take photos of products",
+        NSMicrophoneUsageDescription:
+          "Allow $(PRODUCT_NAME) to access your microphone",
+      },
     },
     android: {
-      package: "com.scanandstock.mobile",
       adaptiveIcon: {
         foregroundImage: "./assets/images/android-app-icon.png",
         monochromeImage: "./assets/images/android-app-icon.png",
@@ -52,6 +57,7 @@ export default {
       edgeToEdgeEnabled: true,
       package: "com.scanandstock.scanandstock",
       predictiveBackGestureEnabled: false,
+      permissions: ["CAMERA"],
       intentFilters: [
         {
           action: "VIEW",
@@ -82,10 +88,11 @@ export default {
       [
         "expo-camera",
         {
-          cameraPermission: "Allow $(PRODUCT_NAME) to access your camera",
+          cameraPermission:
+            "Allow $(PRODUCT_NAME) to access your camera to scan barcodes and take photos of products",
           microphonePermission:
             "Allow $(PRODUCT_NAME) to access your microphone",
-          recordAudioAndroid: true,
+          recordAudioAndroid: false,
         },
       ],
       [
