@@ -19,7 +19,7 @@ interface AccountContextType {
   isLoading: boolean;
   isTracingEnabled: boolean | undefined;
   resetAccount: () => Promise<void>;
-  activeBadgeId: string;
+  activeBadgeId: string | null;
   activeBadgeName: string;
   getBadge: (badge: string) => Promise<void>;
   resetBadge: () => Promise<void>;
@@ -35,7 +35,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const { isAuthenticated } = useAuth();
   const [badgeConnected, setBadgeConnected] = useState(false);
-  const [activeBadgeId, setActiveBadgeId] = useState("");
+  const [activeBadgeId, setActiveBadgeId] = useState<string | null>(null);
   const [activeBadgeName, setActiveBadgeName] = useState("");
   const [activeBadgeScan, setActiveBadgeScan] = useState("");
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -49,9 +49,8 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       const accountsString = await AsyncStorage.getItem("account");
-      const activeAccountString = await AsyncStorage.getItem(
-        "activated_compte"
-      );
+      const activeAccountString =
+        await AsyncStorage.getItem("activated_compte");
       const tracingEnabled = await AsyncStorage.getItem("tracingEnabled");
 
       if (accountsString) {
@@ -104,9 +103,12 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(timerRef.current);
     }
 
-    timerRef.current = setTimeout(() => {
-      resetBadge();
-    }, 1 * 10 * 1000);
+    timerRef.current = setTimeout(
+      () => {
+        resetBadge();
+      },
+      1 * 10 * 1000,
+    );
   };
 
   const loadBadge = async () => {
@@ -167,7 +169,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     setAccounts([]);
     setActiveAccountState(null);
     setIsTracingEnabled(false);
-    setActiveBadgeId("");
+    setActiveBadgeId(null);
     setActiveBadgeName("");
     setActiveBadgeScan("");
     HeaderStore.reset();
