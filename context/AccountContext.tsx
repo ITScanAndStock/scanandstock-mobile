@@ -37,7 +37,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   const [badgeConnected, setBadgeConnected] = useState(false);
   const [activeBadgeId, setActiveBadgeId] = useState<string | null>(null);
   const [activeBadgeName, setActiveBadgeName] = useState("");
-  const [activeBadgeScan, setActiveBadgeScan] = useState("");
+  const [activeBadgeScan, setActiveBadgeScan] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -107,7 +107,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       () => {
         resetBadge();
       },
-      1 * 10 * 1000,
+      1 * 60 * 1000,
     );
   };
 
@@ -147,9 +147,9 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       await AsyncStorage.removeItem("badge-scan");
 
       // Réinitialiser les états
-      setActiveBadgeId("");
+      setActiveBadgeId(null);
       setActiveBadgeName("");
-      setActiveBadgeScan("");
+      setActiveBadgeScan(null);
       setBadgeConnected(false);
       HeaderStore.setBadgeScan(undefined);
 

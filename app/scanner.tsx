@@ -57,7 +57,7 @@ export default function Scanner() {
       "upc_a",
       "upc_e",
     ],
-    []
+    [],
   );
 
   const { refresh: refreshStats, stats } = useStats();
@@ -97,7 +97,7 @@ export default function Scanner() {
   }, []);
 
   const handleBadgeConnexion = async ({ data }: BarcodeScanningResult) => {
-    if (badgeProcessingRef.current || activeBadgeId !== "") return;
+    if (badgeProcessingRef.current || activeBadgeId !== null) return;
 
     badgeProcessingRef.current = true;
     setIsBadgeProcessing(true);
@@ -108,19 +108,19 @@ export default function Scanner() {
       playerSuccess.seekTo(0);
       playerSuccess.play();
       // Attendre un peu avant de naviguer pour que les sons se jouent
-      setTimeout(() => {
-        router.navigate("/");
-      }, 100);
     } catch (error) {
       if (__DEV__) {
         console.error("❌ Erreur lors du scan du badge:", error);
       }
       playerError.seekTo(0);
       playerError.play();
-      // Réactiver uniquement en cas d'erreur
-      badgeProcessingRef.current = false;
-      setIsBadgeProcessing(false);
-      setIsScanning(true);
+    } finally {
+      setTimeout(() => {
+        router.back();
+        badgeProcessingRef.current = false;
+        setIsBadgeProcessing(false);
+        setIsScanning(true);
+      }, 800);
     }
     // Ne pas réactiver le scan en cas de succès car on navigue
   };
@@ -201,7 +201,7 @@ export default function Scanner() {
         }
       }
     },
-    [isScanning, scannedCode, scanCount, method, refreshStats]
+    [isScanning, scannedCode, scanCount, method, refreshStats],
   );
 
   // Mémoiser les settings du scanner
@@ -209,16 +209,16 @@ export default function Scanner() {
     () => ({
       barcodeTypes: typeOfAcceptScan,
     }),
-    [typeOfAcceptScan]
+    [typeOfAcceptScan],
   );
 
   const handleScan = ({ data }: BarcodeScanningResult) => {
     // Ne pas scanner si un traitement est en cours (badge ou produit)
     if (badgeProcessingRef.current || processingRef.current) return;
-
-    if (isTracingEnabled && activeBadgeId === "") {
+    if (isTracingEnabled && activeBadgeId === null) {
       handleBadgeConnexion({ data } as BarcodeScanningResult);
     } else {
+      console.log("tu ne devrait pas arrivé ici", activeBadgeId);
       handleBarcodeScanned({ data } as BarcodeScanningResult);
       if (activeBadgeId !== "") {
         resetAfterTimeout();
