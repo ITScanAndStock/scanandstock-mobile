@@ -14,6 +14,7 @@ class AuthService {
     authorizationEndpoint: `${keycloakConfig.url}realms/${keycloakConfig.realm}/protocol/openid-connect/auth`,
     tokenEndpoint: `${keycloakConfig.url}realms/${keycloakConfig.realm}/protocol/openid-connect/token`,
     revocationEndpoint: `${keycloakConfig.url}realms/${keycloakConfig.realm}/protocol/openid-connect/logout`,
+    endSessionEndpoint: `${keycloakConfig.url}realms/${keycloakConfig.realm}/protocol/openid-connect/logout`,
   };
 
   // Créer la requête d'authentification
@@ -51,7 +52,7 @@ class AuthService {
   private async exchangeCodeForToken(
     code: string,
     redirectUri: string,
-    authRequest: AuthSession.AuthRequest
+    authRequest: AuthSession.AuthRequest,
   ) {
     try {
       const tokenResponse = await AuthSession.exchangeCodeAsync(
@@ -63,11 +64,12 @@ class AuthService {
             code_verifier: authRequest.codeVerifier || "", // ✅ Utilise le code_verifier de l'authRequest
           },
         },
-        this.discovery
+        this.discovery,
       );
 
       // Stocker les tokens
       await this.storeTokens(tokenResponse);
+      await SecureStorageService.setItem("id_tokent", tokenResponse.idToken!);
 
       // Récupérer les informations utilisateur
       await this.fetchUserInfo(tokenResponse.accessToken);
@@ -91,7 +93,7 @@ class AuthService {
     const expiresIn = tokenResponse.expiresIn || 300; // Par défaut 1 heure
     await SecureStorageService.setItem(
       "tokenExpiry",
-      String(Date.now() + expiresIn * 1000)
+      String(Date.now() + expiresIn * 1000),
     );
   }
 
@@ -104,7 +106,7 @@ class AuthService {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
-        }
+        },
       );
 
       const userInfo: UserInfo = await response.json();
@@ -113,7 +115,7 @@ class AuthService {
       await AsyncStorage.setItem("accountName", userInfo.name || "");
       await AsyncStorage.setItem(
         "roles",
-        JSON.stringify(userInfo.realm_access?.roles || [])
+        JSON.stringify(userInfo.realm_access?.roles || []),
       );
 
       return userInfo;
@@ -121,7 +123,7 @@ class AuthService {
       if (__DEV__) {
         console.error(
           "Erreur lors de la récupération des infos utilisateur:",
-          error
+          error,
         );
       }
       throw error;
@@ -172,11 +174,11 @@ class AuthService {
 
       console.log(
         "🔍 AuthService - tokenExpiry:",
-        tokenExpiry ? "présent" : "absent"
+        tokenExpiry ? "présent" : "absent",
       );
       console.log(
         "🔍 AuthService - refreshToken:",
-        refreshToken ? "présent" : "absent"
+        refreshToken ? "présent" : "absent",
       );
 
       if (!tokenExpiry || !refreshToken) {
@@ -192,7 +194,7 @@ class AuthService {
       console.log(
         "🔍 AuthService - Token expire dans:",
         Math.floor((expiryTime - now) / 1000),
-        "secondes"
+        "secondes",
       );
 
       if (expiryTime - now < fiveMinutes) {
@@ -268,7 +270,7 @@ class AuthService {
         if (data.accounts.length > 0) {
           await AsyncStorage.setItem(
             "activated_compte",
-            JSON.stringify(data.accounts[0])
+            JSON.stringify(data.accounts[0]),
           );
         }
       }
@@ -278,7 +280,7 @@ class AuthService {
         data.login?.tracingEnabled ?? data.tracingEnabled ?? false;
       await AsyncStorage.setItem(
         "tracingEnabled",
-        JSON.stringify(tracingEnabled)
+        JSON.stringify(tracingEnabled),
       );
 
       if (__DEV__) {
@@ -297,20 +299,35 @@ class AuthService {
     try {
       // ✅ Récupérer le token de manière sécurisée
       const token = await SecureStorageService.getToken();
+      const refreshToken = await SecureStorageService.getRefreshToken();
 
-      if (token) {
-        // Appeler l'endpoint de logout de Keycloak
+      if (token && refreshToken) {
+        // ✅ 1. Révoquer le refresh token
         await fetch(this.discovery.revocationEndpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
-            Authorization: `Bearer ${token}`,
           },
+          body: new URLSearchParams({
+            client_id: keycloakConfig.clientId,
+            token: refreshToken,
+            token_type_hint: "refresh_token",
+          }).toString(),
         });
-      }
 
-      // ✅ Nettoyer les tokens sécurisés
-      await SecureStorageService.clearTokens();
+        // ✅ 2. Logout OIDC avec redirection
+        const redirectUri = AuthSession.makeRedirectUri({
+          scheme: "scanandstock",
+          path: "logout",
+        });
+
+        const logoutUrl =
+          `${this.discovery.endSessionEndpoint}?` +
+          `client_id=${keycloakConfig.clientId}&` +
+          `post_logout_redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+        await WebBrowser.openAuthSessionAsync(logoutUrl, redirectUri);
+      }
 
       // Nettoyer les autres données du stockage local
       await AsyncStorage.multiRemove([
@@ -328,6 +345,7 @@ class AuthService {
         "badge_id",
         "user_name",
         "badge-scan",
+        "id_token",
       ]);
     } catch (error) {
       console.error("Erreur lors de la déconnexion:", error);
