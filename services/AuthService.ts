@@ -281,6 +281,11 @@ class AuthService {
         }
       }
 
+      const roles: any[] = data.login.roles;
+      if (roles.includes("STATS_VIEWER")) {
+        await AsyncStorage.setItem("roles", JSON.stringify(roles));
+      }
+
       // Sauvegarder tracingEnabled
       const tracingEnabled =
         data.login?.tracingEnabled ?? data.tracingEnabled ?? false;
