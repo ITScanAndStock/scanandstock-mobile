@@ -7,7 +7,6 @@ import Toast from "react-native-toast-message";
 
 // import expo
 import { useFonts } from "expo-font";
-import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 
 // import components
@@ -17,8 +16,6 @@ import { StatsProvider } from "@/context/StatsContext";
 import CustomSplashScreen from "../components/CustomSplashScreen";
 import Header from "../components/Header";
 import RootNavigator from "./RootNavigator";
-
-SplashScreen.preventAutoHideAsync();
 
 function RootLayoutContent() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -38,7 +35,6 @@ function RootLayoutContent() {
 
     if ((fontsLoaded || fontsError) && !isLoading) {
       setAppIsReady(true);
-      void SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontsError, isLoading]);
 

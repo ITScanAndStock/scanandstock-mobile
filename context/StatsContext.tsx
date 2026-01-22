@@ -1,10 +1,9 @@
-import ToastService from "@/services/ToastService";
 import React, {
-	createContext,
-	useCallback,
-	useContext,
-	useEffect,
-	useState,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
 } from "react";
 import { StatsModel } from "../model/Stats";
 import ProductService from "../services/ProductService";
@@ -33,18 +32,15 @@ export function StatsProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (isTracingEnabled && activeBadgeId === null) {
-      ToastService.info("aucun bagde connecté", "Les stats non affiché");
-      setStats(undefined);
-      setLastAccountId(null);
-      return;
-    }
-
     try {
       setIsLoading(true);
       setError(null);
       const response = await ProductService.getStats();
-      setStats(response);
+      if (response) {
+        setStats(response);
+      } else {
+        setStats([]);
+      }
       setLastAccountId(activeAccount.id);
     } catch (err) {
       setError(err as Error);

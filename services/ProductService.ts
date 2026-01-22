@@ -10,7 +10,7 @@ class ProductService {
       const response = await apiClient.get<StatsResponse>(
         "/statistics/stocks/last",
       );
-      const statsList = response.data.content.slice(0, 3);
+      const statsList = response.data.content;
 
       return statsList;
     } catch (e) {

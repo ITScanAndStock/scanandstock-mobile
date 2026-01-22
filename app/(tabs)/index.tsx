@@ -68,27 +68,29 @@ export default function Scan() {
           <ThemedText variant="textBtn"> scannez</ThemedText>
         </View>
       </Link>
-
       <View
         style={styles.historyContainer}
         accessible={true}
         accessibilityLabel="Historique des dernières statistiques"
         accessibilityRole="list"
       >
-        <LinearGradient
-          style={styles.backgroundGradient}
-          colors={["#12A19A40", "#12A19A1C"]}
-        />
-        {isLoading ? (
-          <ActivityIndicator
-            size="large"
-            color={colors.DARK}
-            accessibilityLabel="Chargement des statistiques"
-          />
-        ) : (
-          stats?.map((stat, index) => {
-            return <Stat key={index} {...stat} />;
-          })
+        {stats && (
+          <LinearGradient
+            style={styles.backgroundGradient}
+            colors={["#12A19A40", "#12A19A1C"]}
+          >
+            {isLoading ? (
+              <ActivityIndicator
+                size="large"
+                color={colors.DARK}
+                accessibilityLabel="Chargement des statistiques"
+              />
+            ) : (
+              stats?.map((stat, index) => {
+                return <Stat key={index} {...stat} />;
+              })
+            )}
+          </LinearGradient>
         )}
       </View>
     </View>
@@ -98,11 +100,11 @@ export default function Scan() {
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
     alignItems: "center",
     padding: 12,
   },
   svg: {
+    marginTop: 50,
     marginBottom: 20,
   },
   btn: {
@@ -123,19 +125,21 @@ export const styles = StyleSheet.create({
   },
   historyContainer: {
     width: "100%",
+    maxWidth: 500,
     padding: 10,
     boxSizing: "border-box",
     justifyContent: "space-around",
-    alignItems: "center",
-    marginTop: 20,
-    height: 140,
+    flex: 1,
   },
   backgroundGradient: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    height: 140,
+    width: "100%",
+    height: "80%",
+    maxHeight: 250,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    boxSizing: "border-box",
+    justifyContent: "space-around",
+    alignItems: "center",
     borderRadius: 15,
   },
 });
