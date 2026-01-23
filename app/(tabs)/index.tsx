@@ -28,7 +28,7 @@ export default function Scan() {
   return (
     <View style={styles.container}>
       <ChoosAccount />
-      {activeBadgeId === null ? (
+      {activeBadgeId !== null ? (
         <QrCode
           width={140}
           height={140}
