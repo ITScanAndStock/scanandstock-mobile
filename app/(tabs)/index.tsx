@@ -101,6 +101,7 @@ export const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: "center",
+    justifyContent: "center",
     padding: 12,
   },
   svg: {
@@ -130,6 +131,7 @@ export const styles = StyleSheet.create({
     boxSizing: "border-box",
     justifyContent: "space-around",
     flex: 1,
+    maxHeight: 400,
   },
   backgroundGradient: {
     width: "100%",
