@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // import react native
 import AntDesign from "@expo/vector-icons/AntDesign";
-import { Button, StyleSheet, Text, Vibration, View } from "react-native";
+import { Alert, Button, StyleSheet, Text, Vibration, View } from "react-native";
 import Box from "../assets/images/box.svg";
 
 // Types
@@ -21,6 +21,8 @@ import {
 import InformationBanner from "@/components/ui-components/InformationBanner";
 import { colors } from "@/constants/colors";
 import { useAccount } from "@/context/AccountContext";
+import { AxiosErrorType } from "@/model/ApiError";
+import ToastService from "@/services/ToastService";
 import { useAudioPlayer } from "expo-audio";
 import { router } from "expo-router";
 import GoBackHeader from "../components/GoBackHeader";
@@ -172,12 +174,51 @@ export default function Scanner() {
               playerSuccess.seekTo(0);
               playerSuccess.play();
             })
-            .catch((error) => {
+            .catch((error: AxiosErrorType) => {
               if (__DEV__) {
                 console.error("❌ Erreur lors du scan:", error);
+                console.warn("erreur repéré : ", error);
               }
-              playerError.seekTo(0);
-              playerError.play();
+
+              if (error.response?.status === 409) {
+                Alert.alert(
+                  "Attention : péremption plus proche détectée",
+                  "Un autre lot de ce produit expire avant celui-ci. Voulez-vous tout de même sortir ce lot ?",
+                  [
+                    {
+                      text: "Annuler",
+                      style: "cancel",
+                      onPress: () =>
+                        ToastService.info("Vous avez annulé le scan"),
+                    },
+                    {
+                      text: "Forcer la sortie",
+                      style: "destructive",
+                      onPress: () => {
+                        ProductService.scan(cleanedCode, method, true)
+                          .then(() => {
+                            refreshStats();
+                            playerSuccess.seekTo(0);
+                            playerSuccess.play();
+                          })
+                          .catch((error) => {
+                            if (__DEV__) {
+                              console.error(
+                                "❌ Erreur lors du scan forcé:",
+                                error,
+                              );
+                            }
+                            playerError.seekTo(0);
+                            playerError.play();
+                          });
+                      },
+                    },
+                  ],
+                );
+              } else {
+                playerError.seekTo(0);
+                playerError.play();
+              }
             })
             .finally(() => {
               setIsProcessing(false);
@@ -218,7 +259,6 @@ export default function Scanner() {
     if (isTracingEnabled && activeBadgeId === null) {
       handleBadgeConnexion({ data } as BarcodeScanningResult);
     } else {
-      console.log("tu ne devrait pas arrivé ici", activeBadgeId);
       handleBarcodeScanned({ data } as BarcodeScanningResult);
       if (activeBadgeId !== "") {
         resetAfterTimeout();

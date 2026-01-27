@@ -24,12 +24,18 @@ class ProductService {
   async scan(
     code: string,
     method: Method,
+    force?: boolean,
     retryCount: number = 0,
   ): Promise<StockModel> {
     const MAX_RETRIES = 2;
 
     try {
-      const stockModel = this.getStockModel(code, method);
+      let stockModel;
+      if (force) {
+        stockModel = this.getStockModel(code, method, force);
+      } else {
+        stockModel = this.getStockModel(code, method);
+      }
       const response = await apiClient.put<any>("/product/stock", stockModel);
 
       // Afficher un message de succès
@@ -55,7 +61,7 @@ class ProductService {
         await new Promise((resolve) =>
           setTimeout(resolve, 1000 * (retryCount + 1)),
         );
-        return this.scan(code, method, retryCount + 1);
+        return this.scan(code, method, force, retryCount + 1);
       }
 
       if (__DEV__) {
@@ -65,18 +71,20 @@ class ProductService {
         console.error("Message:", axiosError.response?.data);
         console.error("URL:", axiosError.config?.url);
       }
-
-      const errorMessage =
-        axiosError.response?.data?.errorMessage ||
-        "Erreur lors du scan du produit";
-      ToastService.error(errorMessage);
+      let errorMessage = "Erreur lors du scan du produit";
+      if (axiosError.response?.status !== 409) {
+        ToastService.error(errorMessage);
+      }
       throw error;
     }
   }
-  getStockModel(scan: string, method: Method): StockModel {
+  getStockModel(scan: string, method: Method, force?: boolean): StockModel {
     const stockModel = new StockModel();
     stockModel.code = scan;
     stockModel.action = method;
+    if (force) {
+      stockModel.force = true;
+    }
     return stockModel;
   }
 }
