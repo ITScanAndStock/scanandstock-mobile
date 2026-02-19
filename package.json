@@ -1,7 +1,7 @@
 {
   "name": "scanandstock",
   "main": "expo-router/entry",
-  "version": "1.0.4",
+  "version": "1.0.7",
   "scripts": {
     "start": "expo start",
     "start:dev": "cp .env.development .env 2>nul || copy .env.development .env && expo start",

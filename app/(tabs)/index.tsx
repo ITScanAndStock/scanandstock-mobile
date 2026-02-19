@@ -28,22 +28,22 @@ export default function Scan() {
   return (
     <View style={styles.container}>
       <ChoosAccount />
-      {activeBadgeId !== null ? (
-        <QrCode
-          width={140}
-          height={140}
-          style={styles.svg}
-          accessible={true}
-          accessibilityLabel="Badge ScanAndStock"
-          accessibilityRole="image"
-        />
-      ) : (
+      {isTracingEnabled && activeBadgeId === null ? (
         <Badge
           width={160}
           height={160}
           style={styles.svg}
           accessible={true}
-          accessibilityLabel="Badge ScanAndStock"
+          accessibilityLabel="Scanner votre badge"
+          accessibilityRole="image"
+        />
+      ) : (
+        <QrCode
+          width={140}
+          height={140}
+          style={styles.svg}
+          accessible={true}
+          accessibilityLabel="Scanner un produit"
           accessibilityRole="image"
         />
       )}
