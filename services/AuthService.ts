@@ -9,7 +9,14 @@ import SecureStorageService from "./SecureStorageService";
 // Nécessaire pour que le navigateur se ferme après l'authentification
 WebBrowser.maybeCompleteAuthSession();
 
+const REFRESH_MARGIN_MS = 60 * 1000;
+
+type SessionEndedListener = () => void;
+
 class AuthService {
+  private refreshInFlight: Promise<string> | null = null;
+  private sessionEndedListeners = new Set<SessionEndedListener>();
+
   private discovery = {
     authorizationEndpoint: `${keycloakConfig.url}realms/${keycloakConfig.realm}/protocol/openid-connect/auth`,
     tokenEndpoint: `${keycloakConfig.url}realms/${keycloakConfig.realm}/protocol/openid-connect/token`,
@@ -96,7 +103,7 @@ class AuthService {
     if (tokenResponse.refreshToken) {
       await SecureStorageService.setRefreshToken(tokenResponse.refreshToken);
     }
-    const expiresIn = tokenResponse.expiresIn || 300; // Par défaut 1 heure
+    const expiresIn = tokenResponse.expiresIn || 300;
     await SecureStorageService.setItem(
       "tokenExpiry",
       String(Date.now() + expiresIn * 1000),
@@ -136,35 +143,47 @@ class AuthService {
     }
   }
 
+  onSessionEnded(listener: SessionEndedListener): () => void {
+    this.sessionEndedListeners.add(listener);
+    return () => {
+      this.sessionEndedListeners.delete(listener);
+    };
+  }
+
   // Rafraîchir le token
-  async refreshToken() {
+  refreshToken(): Promise<string> {
+    if (!this.refreshInFlight) {
+      this.refreshInFlight = this.renewTokens().finally(() => {
+        this.refreshInFlight = null;
+      });
+    }
+    return this.refreshInFlight;
+  }
+
+  private async renewTokens(): Promise<string> {
     try {
-      // ✅ Récupérer le refresh token de manière sécurisée
       const refreshToken = await SecureStorageService.getRefreshToken();
 
       if (!refreshToken) {
         throw new Error("Pas de refresh token disponible");
       }
 
-      const response = await fetch(this.discovery.tokenEndpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          grant_type: "refresh_token",
-          refresh_token: refreshToken,
-          client_id: keycloakConfig.clientId,
-        }).toString(),
-      });
+      const tokenResponse = await AuthSession.refreshAsync(
+        { clientId: keycloakConfig.clientId, refreshToken },
+        this.discovery,
+      );
 
-      const tokenResponse = await response.json();
+      if (!tokenResponse.accessToken) {
+        throw new Error("Réponse de Keycloak sans access token");
+      }
+
       await this.storeTokens(tokenResponse);
 
       return tokenResponse.accessToken;
     } catch (error) {
-      console.error("Erreur lors du refresh du token:", error);
-      // Si le refresh échoue, déconnecter l'utilisateur
+      if (__DEV__) {
+        console.error("Erreur lors du refresh du token:", error);
+      }
       await this.logout();
       throw error;
     }
@@ -192,10 +211,8 @@ class AuthService {
         return false;
       }
 
-      // Vérifier si le token expire dans moins de 5 minutes
       const expiryTime = parseInt(tokenExpiry);
       const now = Date.now();
-      const fiveMinutes = 5 * 60 * 1000;
 
       console.log(
         "🔍 AuthService - Token expire dans:",
@@ -203,7 +220,7 @@ class AuthService {
         "secondes",
       );
 
-      if (expiryTime - now < fiveMinutes) {
+      if (expiryTime - now < REFRESH_MARGIN_MS) {
         // Token expire bientôt, le rafraîchir
         try {
           console.log("🔄 AuthService - Rafraîchissement du token...");
@@ -356,6 +373,8 @@ class AuthService {
       ]);
     } catch (error) {
       console.error("Erreur lors de la déconnexion:", error);
+    } finally {
+      this.sessionEndedListeners.forEach((listener) => listener());
     }
   }
 

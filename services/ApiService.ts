@@ -1,6 +1,5 @@
 // services/ApiService.ts
 import axios from "axios";
-import { router } from "expo-router";
 import { apiConfig } from "../config/KeycloakConfig";
 import HeaderStore from "../state/HeaderStore";
 import AuthService from "./AuthService";
@@ -55,18 +54,11 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        await AuthService.refreshToken();
-        const newToken = await AuthService.getToken();
-
-        if (newToken) {
-          originalRequest.headers.Authorization = `Bearer ${newToken}`;
-          return apiClient(originalRequest);
-        }
-      } catch (refreshError) {
-        // Le refresh a échoué, déconnecter l'utilisateur
-        await AuthService.logout();
-        // Rediriger vers la page de connexion
-        router.replace("/login");
+        const newToken = await AuthService.refreshToken();
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return apiClient(originalRequest);
+      } catch {
+        // refreshToken has already ended the session and notified AuthContext.
       }
     }
 

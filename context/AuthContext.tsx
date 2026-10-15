@@ -57,6 +57,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, []);
 
+  useEffect(
+    () =>
+      AuthService.onSessionEnded(() => {
+        setIsAuthenticated(false);
+      }),
+    [],
+  );
+
   const checkAuth = async () => {
     try {
       const isValid = await AuthService.isTokenValid();
