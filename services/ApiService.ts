@@ -58,7 +58,7 @@ apiClient.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return apiClient(originalRequest);
       } catch {
-        // refreshToken has already ended the session and notified AuthContext.
+        // refreshToken ends the session itself when Keycloak refuses the token.
       }
     }
 

@@ -13,6 +13,13 @@ const REFRESH_MARGIN_MS = 60 * 1000;
 
 type SessionEndedListener = () => void;
 
+class SessionRejectedError extends Error {}
+
+// Only an explicit refusal ends the session: network failures and Keycloak outages keep it.
+const isSessionRejected = (error: unknown) =>
+  error instanceof SessionRejectedError ||
+  (error instanceof AuthSession.TokenError && error.code === "invalid_grant");
+
 class AuthService {
   private refreshInFlight: Promise<string> | null = null;
   private sessionEndedListeners = new Set<SessionEndedListener>();
@@ -165,7 +172,7 @@ class AuthService {
       const refreshToken = await SecureStorageService.getRefreshToken();
 
       if (!refreshToken) {
-        throw new Error("Pas de refresh token disponible");
+        throw new SessionRejectedError("Pas de refresh token disponible");
       }
 
       const tokenResponse = await AuthSession.refreshAsync(
@@ -174,7 +181,7 @@ class AuthService {
       );
 
       if (!tokenResponse.accessToken) {
-        throw new Error("Réponse de Keycloak sans access token");
+        throw new SessionRejectedError("Réponse de Keycloak sans access token");
       }
 
       await this.storeTokens(tokenResponse);
@@ -184,7 +191,9 @@ class AuthService {
       if (__DEV__) {
         console.error("Erreur lors du refresh du token:", error);
       }
-      await this.logout();
+      if (isSessionRejected(error)) {
+        await this.logout();
+      }
       throw error;
     }
   }
@@ -228,9 +237,8 @@ class AuthService {
           console.log("✅ AuthService - Token rafraîchi avec succès");
           return true;
         } catch (error) {
-          // Si le refresh échoue, retourner false
           console.error("❌ AuthService - Échec du rafraîchissement:", error);
-          return false;
+          return !isSessionRejected(error);
         }
       }
 
