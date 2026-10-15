@@ -1,21 +1,17 @@
-import { memo, useCallback, useState } from 'react';
+import { memo } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { colors } from '../constants/colors';
 import { Method } from '../model/Stock';
 import ThemedText from './ui-components/ThemedText';
 
 interface MouvementButtonProps {
+	method: Method;
 	setMethod: (method: Method) => void;
 }
 
-function MouvementButton({ setMethod }: MouvementButtonProps) {
-	const [activeClass, setActiveClass] = useState(0);
-
-	const handlePress = useCallback(() => {
-		const newActive = activeClass === 1 ? 0 : 1;
-		setActiveClass(newActive);
-		setMethod(newActive === 1 ? Method.increase : Method.decrease);
-	}, [activeClass, setMethod]);
+function MouvementButton({ method, setMethod }: MouvementButtonProps) {
+	const isDecrease = method === Method.decrease;
+	const isIncrease = method === Method.increase;
 
 	return (
 		<View
@@ -25,33 +21,33 @@ function MouvementButton({ setMethod }: MouvementButtonProps) {
 			accessibilityRole="radiogroup"
 		>
 			<TouchableOpacity
-				onPress={handlePress}
-				style={[styles.btn, activeClass === 0 ? styles.active : null]}
+				onPress={() => setMethod(Method.decrease)}
+				style={[styles.btn, isDecrease ? styles.active : null]}
 				accessible={true}
 				accessibilityLabel="Sortie de stock"
 				accessibilityHint="Appuyez pour scanner des produits en sortie de stock"
 				accessibilityRole="radio"
-				accessibilityState={{ selected: activeClass === 0, checked: activeClass === 0 }}
+				accessibilityState={{ selected: isDecrease, checked: isDecrease }}
 			>
 				<ThemedText
 					variant="productAttribut"
-					color={activeClass === 0 ? 'WHITE' : 'DARK'}
+					color={isDecrease ? 'WHITE' : 'DARK'}
 				>
 					sortie de stock
 				</ThemedText>
 			</TouchableOpacity>
 			<TouchableOpacity
-				onPress={handlePress}
-				style={[styles.btn, activeClass === 1 ? styles.active : null]}
+				onPress={() => setMethod(Method.increase)}
+				style={[styles.btn, isIncrease ? styles.active : null]}
 				accessible={true}
 				accessibilityLabel="Entrée de stock"
 				accessibilityHint="Appuyez pour scanner des produits en entrée de stock"
 				accessibilityRole="radio"
-				accessibilityState={{ selected: activeClass === 1, checked: activeClass === 1 }}
+				accessibilityState={{ selected: isIncrease, checked: isIncrease }}
 			>
 				<ThemedText
 					variant="productAttribut"
-					color={activeClass === 1 ? 'WHITE' : 'DARK'}
+					color={isIncrease ? 'WHITE' : 'DARK'}
 				>
 					entrée de stock
 				</ThemedText>
