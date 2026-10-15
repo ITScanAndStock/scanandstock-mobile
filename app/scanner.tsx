@@ -371,7 +371,7 @@ export default function Scanner() {
             </Text>
           </View>
         </View>
-        <MouvementButton setMethod={handleMethodChange} />
+        <MouvementButton method={method} setMethod={handleMethodChange} />
       </View>
       <ScanLoader visible={isProcessing || isBadgeProcessing} />
     </View>
