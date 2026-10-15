@@ -40,32 +40,48 @@ vi.mock("../../config/KeycloakConfig", () => ({
   apiConfig: { apiUrl: "https://api.test/api" },
 }));
 
-// Mirrors the library contract: POST to the token endpoint, snake_case JSON mapped to camelCase.
-vi.mock("expo-auth-session", () => ({
-  refreshAsync: async (
-    config: { clientId: string; refreshToken: string },
-    discovery: { tokenEndpoint: string },
-  ) => {
-    const response = await fetch(discovery.tokenEndpoint, {
-      method: "POST",
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: config.refreshToken,
-        client_id: config.clientId,
-      }).toString(),
-    });
-    const json = await response.json();
-    if (!response.ok || json.error) {
-      throw new Error(json.error ?? `HTTP ${response.status}`);
+// Mirrors the library contract: POST to the token endpoint, TokenError only when the JSON
+// carries `error`, network failures propagate, snake_case JSON mapped to camelCase.
+vi.mock("expo-auth-session", () => {
+  class TokenError extends Error {
+    code: string;
+    constructor(params: { error: string }) {
+      super(params.error);
+      this.code = params.error;
     }
-    return {
-      accessToken: json.access_token,
-      refreshToken: json.refresh_token,
-      expiresIn: json.expires_in,
-      idToken: json.id_token,
-    };
-  },
-}));
+  }
+  return {
+    TokenError,
+    refreshAsync: async (
+      config: { clientId: string; refreshToken: string },
+      discovery: { tokenEndpoint: string },
+    ) => {
+      const response = await fetch(discovery.tokenEndpoint, {
+        method: "POST",
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: config.refreshToken,
+          client_id: config.clientId,
+        }).toString(),
+      });
+      const json = await response.json();
+      if ("error" in json) {
+        throw new TokenError(json);
+      }
+      return {
+        accessToken: json.access_token,
+        refreshToken: json.refresh_token,
+        expiresIn: json.expires_in,
+        idToken: json.id_token,
+      };
+    },
+  };
+});
+
+const networkDown = () =>
+  vi.fn(async () => {
+    throw new TypeError("Network request failed");
+  });
 
 const keycloakAnswers = (status: number, body: object) =>
   vi.fn(async () => new Response(JSON.stringify(body), { status }));
@@ -135,6 +151,33 @@ describe("AuthService.refreshToken", () => {
     expect(secureStore.has("refreshToken")).toBe(false);
     expect(onSessionEnded).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps the session when the network fails during the renewal", async () => {
+    vi.stubGlobal("fetch", networkDown());
+    const onSessionEnded = vi.fn();
+    AuthService.onSessionEnded(onSessionEnded);
+
+    await expect(AuthService.refreshToken()).rejects.toThrow("Network request failed");
+
+    expect(secureStore.get("token")).toBe("old-access");
+    expect(secureStore.get("refreshToken")).toBe("old-refresh");
+    expect(onSessionEnded).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["an HTML error page", 502, "<html>Bad Gateway</html>"],
+    ["a temporarily_unavailable error", 503, JSON.stringify({ error: "temporarily_unavailable" })],
+    ["a server_error", 500, JSON.stringify({ error: "server_error" })],
+  ])("keeps the session when Keycloak answers %s", async (_label, status, body) => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(body, { status })));
+    const onSessionEnded = vi.fn();
+    AuthService.onSessionEnded(onSessionEnded);
+
+    await expect(AuthService.refreshToken()).rejects.toThrow();
+
+    expect(secureStore.get("refreshToken")).toBe("old-refresh");
+    expect(onSessionEnded).not.toHaveBeenCalled();
+  });
 });
 
 describe("AuthService.getToken", () => {
@@ -159,5 +202,16 @@ describe("AuthService.getToken", () => {
 
     expect(token).toBe("current-access");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the user authenticated when the renewal cannot reach Keycloak", async () => {
+    vi.stubGlobal("fetch", networkDown());
+    secureStore.set("tokenExpiry", String(Date.now() - 60_000));
+
+    const isValid = await AuthService.isTokenValid();
+    const token = await AuthService.getToken();
+
+    expect(isValid).toBe(true);
+    expect(token).toBe("current-access");
   });
 });
