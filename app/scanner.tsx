@@ -6,9 +6,6 @@ import AntDesign from "@expo/vector-icons/AntDesign";
 import { Alert, Button, StyleSheet, Text, Vibration, View } from "react-native";
 import Box from "../assets/images/box.svg";
 
-// Types
-type Point = { x: number; y: number };
-
 // import expo
 import {
   BarcodeScanningResult,
@@ -35,6 +32,7 @@ import ProductService from "../services/ProductService";
 
 const audioSourceSucces = require("../assets/sounds/ok.mp3");
 const audioSourceError = require("../assets/sounds/error.mp3");
+const INITIAL_METHOD = Method.decrease;
 
 export default function Scanner() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -65,7 +63,7 @@ export default function Scanner() {
   const { refresh: refreshStats, stats } = useStats();
   const [scannedCode, setScannedCode] = useState("");
   const [scanCount, setScanCount] = useState(0);
-  const [method, setMethod] = useState(Method.decrease);
+  const [method, setMethod] = useState(INITIAL_METHOD);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBadgeProcessing, setIsBadgeProcessing] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
@@ -242,7 +240,15 @@ export default function Scanner() {
         }
       }
     },
-    [isScanning, scannedCode, scanCount, method, refreshStats],
+    [
+      isScanning,
+      scannedCode,
+      scanCount,
+      method,
+      refreshStats,
+      playerSuccess,
+      playerError,
+    ],
   );
 
   // Mémoiser les settings du scanner
@@ -280,13 +286,8 @@ export default function Scanner() {
 
   // Afficher la bannière pendant 5 secondes au chargement si en mode sortie de stock
   useEffect(() => {
-    if (method === Method.decrease) {
-      setShowBanner(true);
-      bannerTimeoutRef.current = setTimeout(() => {
-        setShowBanner(false);
-      }, 5000);
-    }
-  }, []);
+    handleMethodChange(INITIAL_METHOD);
+  }, [handleMethodChange]);
 
   // Rendu conditionnel après tous les hooks
   if (!permission) {

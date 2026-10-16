@@ -33,18 +33,14 @@ describe("ProductService", () => {
     vi.resetAllMocks();
   });
 
-  it("returns only the last three stats", async () => {
-    mockedApi.get.mockResolvedValue({
-      data: {
-        content: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }],
-      },
-    });
+  it("returns every stat sent by the API, in order", async () => {
+    const content = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }];
+    mockedApi.get.mockResolvedValue({ data: { content } });
 
     const stats = await ProductService.getStats();
 
     expect(mockedApi.get).toHaveBeenCalledWith("/statistics/stocks/last");
-    expect(stats).toHaveLength(3);
-    expect(stats?.[0]).toEqual({ id: 1 });
+    expect(stats).toEqual(content);
     expect(mockedToast.error).not.toHaveBeenCalled();
   });
 
@@ -56,8 +52,14 @@ describe("ProductService", () => {
     await ProductService.scan("CODE123", Method.increase);
 
     expect(mockedApi.put).toHaveBeenCalledWith("/product/stock", {
+      stockId: 0,
+      stockDetailsId: 0,
       action: Method.increase,
       code: "CODE123",
+      expirationDate: "",
+      batchNumber: "",
+      updateUnit: false,
+      force: false,
     });
     expect(mockedToast.success).toHaveBeenCalledWith("OK", "Succès");
   });
