@@ -1,7 +1,1 @@
-declare global {
-	// eslint-disable-next-line no-var
-	var __DEV__: boolean;
-}
-
-globalThis.__DEV__ = true;
-
+(globalThis as typeof globalThis & { __DEV__: boolean }).__DEV__ = true;
