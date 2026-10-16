@@ -30,7 +30,7 @@ const mockedToast = ToastService as unknown as {
 
 describe("ProductService", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it("returns only the last three stats", async () => {
@@ -62,23 +62,51 @@ describe("ProductService", () => {
     expect(mockedToast.success).toHaveBeenCalledWith("OK", "Succès");
   });
 
-  it("retries network errors before throwing", async () => {
-    vi.useFakeTimers();
-
+  it("sends the scan only once when no answer comes back", async () => {
+    const failure = { code: "ECONNABORTED", message: "timeout" };
     mockedApi.put
-      .mockRejectedValueOnce({ code: "ERR_NETWORK" })
-      .mockResolvedValueOnce({
-        data: { message: "OK<br/>done" },
-      });
+      .mockRejectedValueOnce(failure)
+      .mockResolvedValueOnce({ data: { message: "OK<br/>done" } });
 
-    const scanPromise = ProductService.scan("CODE999", Method.decrease);
+    await expect(
+      ProductService.scan("CODE999", Method.decrease),
+    ).rejects.toBe(failure);
 
-    await vi.runAllTimersAsync();
-    await scanPromise;
+    expect(mockedApi.put).toHaveBeenCalledTimes(1);
+    expect(mockedToast.error).toHaveBeenCalledWith(
+      "Le scan a peut-être été enregistré : vérifiez le stock avant de scanner à nouveau.",
+      "Pas de réponse du serveur",
+    );
+  });
 
-    expect(mockedApi.put).toHaveBeenCalledTimes(2);
+  it("reports a server refusal as a failed scan", async () => {
+    const failure = {
+      response: { status: 500, data: {} },
+      message: "server error",
+    };
+    mockedApi.put.mockRejectedValueOnce(failure);
+
+    await expect(
+      ProductService.scan("CODE500", Method.increase),
+    ).rejects.toBe(failure);
+
+    expect(mockedApi.put).toHaveBeenCalledTimes(1);
+    expect(mockedToast.error).toHaveBeenCalledWith(
+      "Erreur lors du scan du produit",
+    );
+  });
+
+  it("leaves an expiry conflict to the caller without a toast", async () => {
+    const conflict = {
+      response: { status: 409, data: {} },
+      message: "conflict",
+    };
+    mockedApi.put.mockRejectedValueOnce(conflict);
+
+    await expect(
+      ProductService.scan("CODE409", Method.decrease),
+    ).rejects.toBe(conflict);
+
     expect(mockedToast.error).not.toHaveBeenCalled();
-
-    vi.useRealTimers();
   });
 });

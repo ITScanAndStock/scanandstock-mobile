@@ -25,10 +25,7 @@ class ProductService {
     code: string,
     method: Method,
     force?: boolean,
-    retryCount: number = 0,
   ): Promise<StockModel> {
-    const MAX_RETRIES = 2;
-
     try {
       let stockModel;
       if (force) {
@@ -45,24 +42,6 @@ class ProductService {
       return response.data;
     } catch (error) {
       const axiosError = error as AxiosErrorType;
-      // Vérifier si c'est une erreur réseau et si on peut retry
-      const isNetworkError =
-        !axiosError.response ||
-        axiosError.code === "ECONNABORTED" ||
-        axiosError.code === "ERR_NETWORK";
-
-      if (isNetworkError && retryCount < MAX_RETRIES) {
-        if (__DEV__) {
-          console.log(
-            `🔄 Tentative ${retryCount + 1}/${MAX_RETRIES} pour le scan...`,
-          );
-        }
-        // Attendre un peu avant de réessayer (backoff exponentiel)
-        await new Promise((resolve) =>
-          setTimeout(resolve, 1000 * (retryCount + 1)),
-        );
-        return this.scan(code, method, force, retryCount + 1);
-      }
 
       if (__DEV__) {
         console.error("code scanné", code);
@@ -71,9 +50,14 @@ class ProductService {
         console.error("Message:", axiosError.response?.data);
         console.error("URL:", axiosError.config?.url);
       }
-      let errorMessage = "Erreur lors du scan du produit";
-      if (axiosError.response?.status !== 409) {
-        ToastService.error(errorMessage);
+      if (!axiosError.response) {
+        // The stock may have moved server-side, so the scan is never replayed.
+        ToastService.error(
+          "Le scan a peut-être été enregistré : vérifiez le stock avant de scanner à nouveau.",
+          "Pas de réponse du serveur",
+        );
+      } else if (axiosError.response.status !== 409) {
+        ToastService.error("Erreur lors du scan du produit");
       }
       throw error;
     }
