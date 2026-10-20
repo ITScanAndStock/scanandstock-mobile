@@ -1,44 +1,43 @@
-import { colors } from '@/constants/colors';
-import { StyleSheet, View } from 'react-native';
-import ThemedText from './ThemedText';
-// import svg and icons
-import Exclamation from '../../assets/images/exclamation-triangle.svg';
+import { colors } from "@/constants/colors";
+import { StyleSheet, Text, View } from "react-native";
+import Exclamation from "../../assets/images/exclamation-triangle.svg";
 
-export default function NoBadgeScanned() {
-	return (
-		<View
-			style={styles.container}
-			accessible={true}
-			accessibilityRole="alert"
-			accessibilityLabel="Scannez votre badge pour continuer"
-			accessibilityLiveRegion="polite"
-		>
-			<Exclamation
-				height={30}
-				width={30}
-				color={colors.WHITE}
-				accessible={false}
-			/>
-			<ThemedText
-				variant="regularText"
-				color="WHITE"
-			>
-				Scannez votre badge
-			</ThemedText>
-		</View>
-	);
+type NoBadgeScannedProps = {
+  tone?: "default" | "overlay";
+};
+
+export default function NoBadgeScanned({ tone = "default" }: NoBadgeScannedProps) {
+  return (
+    <View
+      style={[styles.container, tone === "overlay" && styles.containerOverlay]}
+      accessible={true}
+      accessibilityRole="alert"
+      accessibilityLabel="Scannez votre badge pour continuer"
+      accessibilityLiveRegion="polite"
+    >
+      <Exclamation height={18} width={18} color={colors.WHITE} accessible={false} />
+      <Text style={styles.text}>Badge</Text>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-	container: {
-		backgroundColor: colors.GREEN,
-		flexDirection: 'row',
-		width: '100%',
-		padding: 12,
-		justifyContent: 'center',
-		alignItems: 'center',
-		marginVertical: 20,
-		gap: 10,
-		borderRadius: 10,
-	},
+  container: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    height: 44,
+    paddingHorizontal: 14,
+    borderRadius: 22,
+    backgroundColor: colors.PILL,
+  },
+  containerOverlay: {
+    backgroundColor: "rgba(22,30,34,0.72)",
+  },
+  text: {
+    color: colors.WHITE,
+    fontSize: 14,
+    fontFamily: "SemiBold",
+    fontWeight: "600",
+  },
 });

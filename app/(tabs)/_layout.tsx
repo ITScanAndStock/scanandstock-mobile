@@ -3,74 +3,76 @@ import { Tabs } from "expo-router";
 
 // import svg and icons
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import type { ComponentProps } from "react";
 
 // import constants
 import { colors } from "@/constants/colors";
+
+type IconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
+
+const tabBarLabelStyle = {
+  fontSize: 10,
+  fontFamily: "Medium",
+  fontWeight: "500" as const,
+};
+
+function TabIcon({ name, focused }: { name: IconName; focused: boolean }) {
+  return <MaterialCommunityIcons name={name} size={24} color={focused ? colors.GREEN_DARK : colors.MUTED} />;
+}
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.GREEN,
-        tabBarInactiveTintColor: colors.DARK,
+        tabBarActiveTintColor: colors.GREEN_DARK,
+        tabBarInactiveTintColor: colors.MUTED,
         headerShown: false,
         tabBarStyle: {
-          height: 60,
+          height: 64,
+          paddingTop: 8,
+          paddingBottom: 4,
+          backgroundColor: colors.WHITE,
+          borderTopWidth: 1,
+          borderTopColor: colors.TAB_BORDER,
         },
+        tabBarLabelStyle,
       }}
     >
       <Tabs.Screen
-        name="index"
-        options={({ navigation }) => {
-          const isFocused = navigation.isFocused();
-          return {
-            title: "Scan",
-            tabBarIcon: ({ focused }) => (
-              <MaterialCommunityIcons
-                name="line-scan"
-                size={24}
-                color={focused ? colors.GREEN : colors.DARK}
-              />
-            ),
-            tabBarLabelStyle: {
-              fontSize: 16,
-              fontFamily: "Montserrat",
-              fontWeight: "900",
-            },
-            tabBarItemStyle: {
-              borderTopWidth: 3,
-              borderTopColor: isFocused ? colors.GREEN : colors.DARK,
-              height: 60,
-            },
-          };
+        name="commandes"
+        options={{
+          title: "Commandes",
+          tabBarIcon: ({ focused }) => <TabIcon name="package-variant-closed" focused={focused} />,
         }}
       />
-      {/* <Tabs.Screen
-				name="profile"
-				options={({ navigation }) => {
-					const isFocused = navigation.isFocused();
-					return {
-						title: 'Info',
-						tabBarIcon: ({ focused }) => (
-							<Feather
-								name="user"
-								size={24}
-								color={focused ? colors.GREEN : colors.DARK}
-							/>
-						),
-						tabBarLabelStyle: {
-							fontSize: 16,
-							fontFamily: 'Montserrat',
-							fontWeight: '900',
-						},
-						tabBarItemStyle: {
-							borderTopWidth: 3,
-							borderTopColor: isFocused ? colors.GREEN : colors.DARK,
-							height: 60,
-						},
-					};
-				}}
-			/> */}
+      <Tabs.Screen
+        name="stock"
+        options={{
+          title: "Stock",
+          tabBarIcon: ({ focused }) => <TabIcon name="layers-outline" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: "Scan",
+          tabBarIcon: ({ focused }) => <TabIcon name="line-scan" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="panier"
+        options={{
+          title: "Panier",
+          tabBarIcon: ({ focused }) => <TabIcon name="cart-outline" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="stats"
+        options={{
+          title: "Stats",
+          tabBarIcon: ({ focused }) => <TabIcon name="chart-bar" focused={focused} />,
+        }}
+      />
     </Tabs>
   );
 }

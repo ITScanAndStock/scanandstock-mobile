@@ -17,8 +17,7 @@ class SessionRejectedError extends Error {}
 
 // Only an explicit refusal ends the session: network failures and Keycloak outages keep it.
 const isSessionRejected = (error: unknown) =>
-  error instanceof SessionRejectedError ||
-  (error instanceof AuthSession.TokenError && error.code === "invalid_grant");
+  error instanceof SessionRejectedError || (error instanceof AuthSession.TokenError && error.code === "invalid_grant");
 
 class AuthService {
   private refreshInFlight: Promise<string> | null = null;
@@ -69,11 +68,7 @@ class AuthService {
   }
 
   // Échanger le code d'autorisation contre un token
-  private async exchangeCodeForToken(
-    code: string,
-    redirectUri: string,
-    authRequest: AuthSession.AuthRequest,
-  ) {
+  private async exchangeCodeForToken(code: string, redirectUri: string, authRequest: AuthSession.AuthRequest) {
     try {
       const tokenResponse = await AuthSession.exchangeCodeAsync(
         {
@@ -111,10 +106,7 @@ class AuthService {
       await SecureStorageService.setRefreshToken(tokenResponse.refreshToken);
     }
     const expiresIn = tokenResponse.expiresIn || 300;
-    await SecureStorageService.setItem(
-      "tokenExpiry",
-      String(Date.now() + expiresIn * 1000),
-    );
+    await SecureStorageService.setItem("tokenExpiry", String(Date.now() + expiresIn * 1000));
   }
 
   // Récupérer les informations utilisateur
@@ -133,18 +125,12 @@ class AuthService {
 
       // Stocker les infos utilisateur
       await AsyncStorage.setItem("accountName", userInfo.name || "");
-      await AsyncStorage.setItem(
-        "roles",
-        JSON.stringify(userInfo.realm_access?.roles || []),
-      );
+      await AsyncStorage.setItem("roles", JSON.stringify(userInfo.realm_access?.roles || []));
 
       return userInfo;
     } catch (error) {
       if (__DEV__) {
-        console.error(
-          "Erreur lors de la récupération des infos utilisateur:",
-          error,
-        );
+        console.error("Erreur lors de la récupération des infos utilisateur:", error);
       }
       throw error;
     }
@@ -206,14 +192,8 @@ class AuthService {
       const tokenExpiry = await SecureStorageService.getItem("tokenExpiry");
       const refreshToken = await SecureStorageService.getRefreshToken();
 
-      console.log(
-        "🔍 AuthService - tokenExpiry:",
-        tokenExpiry ? "présent" : "absent",
-      );
-      console.log(
-        "🔍 AuthService - refreshToken:",
-        refreshToken ? "présent" : "absent",
-      );
+      console.log("🔍 AuthService - tokenExpiry:", tokenExpiry ? "présent" : "absent");
+      console.log("🔍 AuthService - refreshToken:", refreshToken ? "présent" : "absent");
 
       if (!tokenExpiry || !refreshToken) {
         console.log("❌ AuthService - Pas de token ou expiry trouvé");
@@ -223,11 +203,7 @@ class AuthService {
       const expiryTime = parseInt(tokenExpiry);
       const now = Date.now();
 
-      console.log(
-        "🔍 AuthService - Token expire dans:",
-        Math.floor((expiryTime - now) / 1000),
-        "secondes",
-      );
+      console.log("🔍 AuthService - Token expire dans:", Math.floor((expiryTime - now) / 1000), "secondes");
 
       if (expiryTime - now < REFRESH_MARGIN_MS) {
         // Token expire bientôt, le rafraîchir
@@ -299,10 +275,7 @@ class AuthService {
 
         // Sauvegarder le premier compte comme compte actif
         if (data.accounts.length > 0) {
-          await AsyncStorage.setItem(
-            "activated_compte",
-            JSON.stringify(data.accounts[0]),
-          );
+          await AsyncStorage.setItem("activated_compte", JSON.stringify(data.accounts[0]));
         }
       }
 
@@ -312,12 +285,8 @@ class AuthService {
       }
 
       // Sauvegarder tracingEnabled
-      const tracingEnabled =
-        data.login?.tracingEnabled ?? data.tracingEnabled ?? false;
-      await AsyncStorage.setItem(
-        "tracingEnabled",
-        JSON.stringify(tracingEnabled),
-      );
+      const tracingEnabled = data.login?.tracingEnabled ?? data.tracingEnabled ?? false;
+      await AsyncStorage.setItem("tracingEnabled", JSON.stringify(tracingEnabled));
 
       if (__DEV__) {
         console.log("✅ Informations utilisateur stockées avec succès");
@@ -405,6 +374,34 @@ class AuthService {
   // Vérifier si l'utilisateur est superviseur
   async isSupervisor(): Promise<boolean> {
     return await this.hasRole("SUPERVISOR");
+  }
+
+  /**
+   * Whether the current user may start a réception scan on commandes.
+   * Missing roles → allow (keeps current demo/CTA behavior).
+   * When roles are present, require an explicit reception/admin role.
+   */
+  async canReceiveCommandes(): Promise<boolean> {
+    try {
+      const rolesString = await AsyncStorage.getItem("roles");
+      if (!rolesString) {
+        return true;
+      }
+      const roles: string[] = JSON.parse(rolesString);
+      if (!Array.isArray(roles) || roles.length === 0) {
+        return true;
+      }
+      const allowed = [
+        "COMMANDES_RECEPTION",
+        "STOCK_RECEPTION",
+        "RECEPTION",
+        "SUPERVISOR",
+        "ADMIN",
+      ];
+      return roles.some((role) => allowed.includes(role));
+    } catch {
+      return true;
+    }
   }
 }
 

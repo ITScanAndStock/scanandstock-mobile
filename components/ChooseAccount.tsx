@@ -1,149 +1,177 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { useState } from "react";
-import {
-  Animated,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { useRef, useState } from "react";
+import { Animated, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+
+import ChevronDown from "../assets/images/figma/chevron-down.svg";
 import { colors } from "../constants/colors";
 import { useAccount } from "../context/AccountContext";
 import { Account } from "../model/Account";
 
-export default function ChoosAccount() {
+type ChooseAccountProps = {
+  /** Smaller pill used next to screen titles (e.g. Commandes). */
+  compact?: boolean;
+};
+
+export default function ChoosAccount({ compact = false }: ChooseAccountProps) {
   const { accounts, activeAccount, setActiveAccount } = useAccount();
   const [isOpen, setIsOpen] = useState(false);
-  const [animation] = useState(new Animated.Value(0));
+  const [menuVisible, setMenuVisible] = useState(false);
+  const animation = useRef(new Animated.Value(0)).current;
 
   const chooseAccount = (account: Account) => {
     setActiveAccount(account);
-    toggleDropdown();
+    closeMenu();
+  };
+
+  const openMenu = () => {
+    setMenuVisible(true);
+    setIsOpen(true);
+    Animated.timing(animation, {
+      toValue: 1,
+      duration: 160,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const closeMenu = () => {
+    setIsOpen(false);
+    Animated.timing(animation, {
+      toValue: 0,
+      duration: 120,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+        setMenuVisible(false);
+      }
+    });
   };
 
   const toggleDropdown = () => {
-    const toValue = isOpen ? 0 : 1;
-
-    Animated.timing(animation, {
-      toValue,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
-
-    setIsOpen(!isOpen);
+    if (isOpen) {
+      closeMenu();
+    } else {
+      openMenu();
+    }
   };
 
-  const dropdownHeight = animation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, accounts.length * 50],
-  });
-
-  // Rotation de la flèche
   const rotateIcon = animation.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "180deg"],
   });
 
+  const menuOpacity = animation;
+  const menuTranslateY = animation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-4, 0],
+  });
+
+  const chevronSize = compact ? 16 : 18;
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, menuVisible && styles.containerOpen]}>
       <TouchableOpacity
-        style={styles.mainBtn}
+        style={[styles.mainBtn, compact && styles.mainBtnCompact]}
         onPress={toggleDropdown}
         accessible={true}
         accessibilityRole="button"
         accessibilityLabel={`Compte actif: ${activeAccount?.name}`}
-        accessibilityHint={`Appuyez pour ${
-          isOpen ? "fermer" : "ouvrir"
-        } la liste des comptes`}
+        accessibilityHint={`Appuyez pour ${isOpen ? "fermer" : "ouvrir"} la liste des comptes`}
         accessibilityState={{ expanded: isOpen }}
       >
-        <Text style={styles.text}>{activeAccount?.name}</Text>
+        <Text style={[styles.text, compact && styles.textCompact]} numberOfLines={1}>
+          {activeAccount?.name}
+        </Text>
         <Animated.View style={{ transform: [{ rotate: rotateIcon }] }}>
-          <Ionicons
-            name="chevron-down"
-            size={24}
-            color={colors.WHITE}
-            accessible={false}
-          />
+          <ChevronDown width={chevronSize} height={chevronSize} accessible={false} />
         </Animated.View>
       </TouchableOpacity>
 
-      <Animated.View
-        style={[
-          styles.dropdownContainer,
-          { height: dropdownHeight, overflow: "hidden" },
-        ]}
-        accessible={false}
-      >
-        {accounts.map((item) => {
-          const isSelected = item.id === activeAccount?.id;
-          return (
-            <TouchableOpacity
-              key={item.id}
-              onPress={() => chooseAccount(item)}
-              style={styles.items}
-              accessible={true}
-              accessibilityRole="radio"
-              accessibilityLabel={item.name}
-              accessibilityState={{ selected: isSelected, checked: isSelected }}
-              accessibilityHint="Appuyez pour changer de compte"
-            >
-              <Text style={styles.text}>{item.name}</Text>
-              {isSelected ? (
-                <Ionicons
-                  name="radio-button-on"
-                  size={24}
-                  color={colors.WHITE}
-                  accessible={false}
-                />
-              ) : (
-                <Ionicons
-                  name="radio-button-off"
-                  size={24}
-                  color={colors.WHITE}
-                  accessible={false}
-                />
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </Animated.View>
+      {menuVisible ? (
+        <Animated.View
+          pointerEvents={isOpen ? "auto" : "none"}
+          style={[
+            styles.dropdownContainer,
+            compact && styles.dropdownAlignEnd,
+            {
+              opacity: menuOpacity,
+              transform: [{ translateY: menuTranslateY }],
+            },
+          ]}
+          accessible={false}
+        >
+          {accounts.map((item) => {
+            const isSelected = item.id === activeAccount?.id;
+            return (
+              <TouchableOpacity
+                key={item.id}
+                onPress={() => chooseAccount(item)}
+                style={styles.items}
+                accessible={true}
+                accessibilityRole="radio"
+                accessibilityLabel={item.name}
+                accessibilityState={{ selected: isSelected, checked: isSelected }}
+                accessibilityHint="Appuyez pour changer de compte"
+              >
+                <Text style={[styles.text, compact && styles.textCompact]}>{item.name}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    minWidth: "50%",
-    backgroundColor: colors.DARK,
-    position: "absolute",
-    top: 1,
-    left: 0,
-    borderBottomRightRadius: 10,
     zIndex: 3,
+  },
+  containerOpen: {
+    zIndex: 20,
   },
   mainBtn: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    padding: 8,
+    gap: 8,
+    height: 44,
+    paddingHorizontal: 14,
+    borderRadius: 22,
+    backgroundColor: colors.PILL,
+  },
+  mainBtnCompact: {
+    gap: 6,
   },
   dropdownContainer: {
-    backgroundColor: colors.DARK,
-    borderBottomRightRadius: 10,
+    position: "absolute",
+    top: 48,
+    left: 0,
+    minWidth: "100%",
+    backgroundColor: colors.MUTED,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.DARK,
+    paddingVertical: 4,
+  },
+  dropdownAlignEnd: {
+    left: undefined,
+    right: 0,
   },
   text: {
     color: colors.WHITE,
     fontSize: 14,
     fontFamily: "SemiBold",
+    fontWeight: "700",
+    maxWidth: 140,
+  },
+  textCompact: {
+    fontSize: 13,
+    maxWidth: 120,
   },
   items: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 10,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255, 255, 255, 0.1)",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     gap: 20,
   },
 });

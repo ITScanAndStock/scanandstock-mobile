@@ -2,9 +2,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // import react native
-import AntDesign from "@expo/vector-icons/AntDesign";
-import { Alert, Button, StyleSheet, Text, Vibration, View } from "react-native";
-import Box from "../assets/images/box.svg";
+import {
+  Alert,
+  Animated,
+  Button,
+  Easing,
+  Pressable,
+  StyleSheet,
+  Text,
+  Vibration,
+  View,
+} from "react-native";
 
 // import expo
 import {
@@ -13,16 +21,16 @@ import {
   CameraView,
   useCameraPermissions,
 } from "expo-camera";
+import { useAudioPlayer } from "expo-audio";
+import { router } from "expo-router";
 
 // import components
+import CloseIcon from "../assets/images/figma/close.svg";
 import InformationBanner from "@/components/ui-components/InformationBanner";
 import { colors } from "@/constants/colors";
 import { useAccount } from "@/context/AccountContext";
 import { AxiosErrorType } from "@/model/ApiError";
 import ToastService from "@/services/ToastService";
-import { useAudioPlayer } from "expo-audio";
-import { router } from "expo-router";
-import GoBackHeader from "../components/GoBackHeader";
 import MouvementButton from "../components/MouvementButton";
 import ScanBadge from "../components/ScanBadge";
 import ScanLoader from "../components/ScanLoader";
@@ -32,7 +40,8 @@ import ProductService from "../services/ProductService";
 
 const audioSourceSucces = require("../assets/sounds/ok.mp3");
 const audioSourceError = require("../assets/sounds/error.mp3");
-const INITIAL_METHOD = Method.decrease;
+const INITIAL_METHOD = Method.increase;
+const CHIP_BG = "rgba(22,30,34,0.72)";
 
 export default function Scanner() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -67,24 +76,49 @@ export default function Scanner() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBadgeProcessing, setIsBadgeProcessing] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
-  const { isTracingEnabled, activeBadgeId, getBadge, resetAfterTimeout } =
+  const { isTracingEnabled, activeBadgeId, activeAccount, getBadge, resetAfterTimeout } =
     useAccount();
 
-  // Utiliser useRef pour éviter de bloquer le scan pendant le traitement
   const processingRef = useRef(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const bannerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const badgeProcessingRef = useRef(false);
+  const reveal = useRef(new Animated.Value(0)).current;
 
-  // Mémoiser le callback de changement de méthode
+  // Soft reveal hides camera warm-up; matches Accueil dark handoff.
+  useEffect(() => {
+    Animated.timing(reveal, {
+      toValue: 1,
+      duration: 700,
+      delay: 120,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [reveal]);
+
+  const veilOpacity = reveal.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+  const uiOpacity = reveal.interpolate({
+    inputRange: [0, 0.35, 1],
+    outputRange: [0, 0.4, 1],
+  });
+  const uiTranslateY = reveal.interpolate({
+    inputRange: [0, 1],
+    outputRange: [18, 0],
+  });
+
+  const lastScan = stats && stats.length > 0 ? stats[0] : null;
+  const lastScanIncrease =
+    lastScan?.type === "increase" || lastScan?.type === "in" || (lastScan?.quantity ?? 0) > 0;
+  const lastScanQty = Math.abs(lastScan?.quantity ?? 1);
+
   const handleMethodChange = useCallback((newMethod: Method) => {
     setMethod(newMethod);
 
-    // Afficher la bannière si on passe en mode sortie de stock
     if (newMethod === Method.decrease) {
       setShowBanner(true);
-
-      // Masquer la bannière après 5 secondes
       if (bannerTimeoutRef.current) {
         clearTimeout(bannerTimeoutRef.current);
       }
@@ -107,7 +141,6 @@ export default function Scanner() {
       await getBadge(data);
       playerSuccess.seekTo(0);
       playerSuccess.play();
-      // Attendre un peu avant de naviguer pour que les sons se jouent
     } catch (error) {
       if (__DEV__) {
         console.error("❌ Erreur lors du scan du badge:", error);
@@ -122,22 +155,18 @@ export default function Scanner() {
         setIsScanning(true);
       }, 800);
     }
-    // Ne pas réactiver le scan en cas de succès car on navigue
   };
 
-  // Mémoiser le handler pour éviter les re-renders inutiles de CameraView
   const handleBarcodeScanned = useCallback(
     async (result: BarcodeScanningResult) => {
       const { data } = result;
 
-      // Ignorer si déjà en traitement ou scanner désactivé
       if (!isScanning || !data || processingRef.current) {
         return;
       }
 
-      const cleanedCode = data.replace(/\x1D/g, "$"); // \x1D = caractère GS
+      const cleanedCode = data.replace(/\x1D/g, "$");
 
-      // Validation du code-barres
       if (!cleanedCode || cleanedCode.length < 4 || cleanedCode.length > 100) {
         if (__DEV__) {
           console.warn("⚠️ Code-barres invalide (longueur):", cleanedCode);
@@ -145,29 +174,22 @@ export default function Scanner() {
         return;
       }
 
-      // 1. Si c'est un nouveau code différent du précédent
       if (cleanedCode !== scannedCode) {
         setScannedCode(cleanedCode);
         setScanCount(1);
         return;
       }
 
-      // 2. Si c'est le MÊME code que la frame précédente
       if (cleanedCode === scannedCode) {
-        // Si on l'a vu assez de fois (3 frames au lieu de 5 pour plus de réactivité)
         if (scanCount >= 2) {
-          // Marquer comme en traitement immédiatement
           processingRef.current = true;
           setIsProcessing(true);
           setIsScanning(false);
 
-          // Vibration haptique
           Vibration.vibrate(100);
 
-          // Appel API optimisé
           ProductService.scan(cleanedCode, method)
             .then(() => {
-              // Recharger les stats en arrière-plan
               refreshStats();
               playerSuccess.seekTo(0);
               playerSuccess.play();
@@ -186,8 +208,7 @@ export default function Scanner() {
                     {
                       text: "Annuler",
                       style: "cancel",
-                      onPress: () =>
-                        ToastService.info("Vous avez annulé le scan"),
+                      onPress: () => ToastService.info("Vous avez annulé le scan"),
                     },
                     {
                       text: "Forcer la sortie",
@@ -199,12 +220,9 @@ export default function Scanner() {
                             playerSuccess.seekTo(0);
                             playerSuccess.play();
                           })
-                          .catch((error) => {
+                          .catch((forcedError) => {
                             if (__DEV__) {
-                              console.error(
-                                "❌ Erreur lors du scan forcé:",
-                                error,
-                              );
+                              console.error("❌ Erreur lors du scan forcé:", forcedError);
                             }
                             playerError.seekTo(0);
                             playerError.play();
@@ -223,11 +241,9 @@ export default function Scanner() {
               processingRef.current = false;
             });
 
-          // Reset immédiat pour le prochain scan
           setScannedCode("");
           setScanCount(0);
 
-          // Réactiver le scan après un délai réduit
           if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
           }
@@ -235,23 +251,13 @@ export default function Scanner() {
             setIsScanning(true);
           }, 2000);
         } else {
-          // Incrémenter le compteur
           setScanCount((prev) => prev + 1);
         }
       }
     },
-    [
-      isScanning,
-      scannedCode,
-      scanCount,
-      method,
-      refreshStats,
-      playerSuccess,
-      playerError,
-    ],
+    [isScanning, scannedCode, scanCount, method, refreshStats, playerSuccess, playerError],
   );
 
-  // Mémoiser les settings du scanner
   const barcodeScannerSettings = useMemo(
     () => ({
       barcodeTypes: typeOfAcceptScan,
@@ -260,7 +266,6 @@ export default function Scanner() {
   );
 
   const handleScan = ({ data }: BarcodeScanningResult) => {
-    // Ne pas scanner si un traitement est en cours (badge ou produit)
     if (badgeProcessingRef.current || processingRef.current) return;
     if (isTracingEnabled && activeBadgeId === null) {
       handleBadgeConnexion({ data } as BarcodeScanningResult);
@@ -272,7 +277,6 @@ export default function Scanner() {
     }
   };
 
-  // Cleanup du timeout lors du démontage du composant
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
@@ -284,19 +288,15 @@ export default function Scanner() {
     };
   }, []);
 
-  // Afficher la bannière pendant 5 secondes au chargement si en mode sortie de stock
   useEffect(() => {
     handleMethodChange(INITIAL_METHOD);
   }, [handleMethodChange]);
 
-  // Rendu conditionnel après tous les hooks
   if (!permission) {
-    // Camera permissions are still loading.
     return <View style={styles.container} />;
   }
 
   if (!permission.granted) {
-    // Camera permissions are not granted yet.
     return (
       <View
         style={styles.container}
@@ -322,58 +322,93 @@ export default function Scanner() {
         barcodeScannerSettings={barcodeScannerSettings}
         onBarcodeScanned={handleScan}
       />
-      <GoBackHeader />
-      <View style={styles.banner}>
+
+      <Animated.View
+        style={[styles.overlay, { opacity: uiOpacity }]}
+        pointerEvents="box-none"
+      >
+        <Animated.View
+          style={[styles.topRow, { transform: [{ translateY: uiTranslateY }] }]}
+          pointerEvents="box-none"
+        >
+          <View style={styles.accountChip} accessible={true} accessibilityLabel={`Compte actif: ${activeAccount?.name}`}>
+            <Text style={styles.accountChipText} numberOfLines={1}>
+              {activeAccount?.name ?? "Compte"}
+            </Text>
+          </View>
+          <ScanBadge tone="overlay" />
+        </Animated.View>
+
         {showBanner && method === Method.decrease ? (
-          <InformationBanner title="Attention la sortie de stock est activée" />
-        ) : isTracingEnabled && activeBadgeId !== "" ? (
-          <ScanBadge />
+          <View style={styles.bannerWrap}>
+            <InformationBanner title="Attention la sortie de stock est activée" />
+          </View>
         ) : null}
-      </View>
-      <View style={styles.foot}>
-        <View style={styles.stats}>
-          <View style={styles.text}>
-            {stats && stats.length > 0 && stats[0].type === "increase" ? (
-              <AntDesign
-                name="arrow-up"
-                size={24}
-                color="green"
-                accessible={false}
-              />
-            ) : (
-              <AntDesign
-                name="arrow-down"
-                size={24}
-                color="red"
-                accessible={false}
-                style={{ margin: 0 }}
-              />
-            )}
-            <Text
-              style={{
-                fontFamily: "SemiBold",
-                color: colors.WHITE,
-                fontSize: 16,
-              }}
-            >
-              {stats && stats.length > 0 ? stats[0].designation : ""}
-            </Text>
-          </View>
-          <View style={styles.text}>
-            <Box width={24} />
-            <Text
-              style={{
-                fontFamily: "Regular",
-                color: colors.WHITE,
-                fontSize: 15,
-              }}
-            >
-              STOCK(S) : {stats && stats.length > 0 ? stats[0].totalStock : 0}
-            </Text>
-          </View>
+
+        <View style={styles.viewfinder} pointerEvents="none">
+          <View style={[styles.corner, styles.cornerTL]} />
+          <View style={[styles.corner, styles.cornerTR]} />
+          <View style={[styles.corner, styles.cornerBL]} />
+          <View style={[styles.corner, styles.cornerBR]} />
         </View>
-        <MouvementButton method={method} setMethod={handleMethodChange} />
-      </View>
+
+        <Animated.View style={[styles.bottomBlock, { transform: [{ translateY: uiTranslateY }] }]}>
+          {lastScan ? (
+            <View
+              style={styles.lastScanCard}
+              accessible={true}
+              accessibilityLabel={`Dernier scan: ${lastScan.designation}, ${lastScanIncrease ? "+" : "−"}${lastScanQty}`}
+            >
+              <View style={styles.lastScanText}>
+                <Text style={styles.lastScanLabel}>Dernier scan</Text>
+                <Text style={styles.lastScanName} numberOfLines={1}>
+                  {lastScan.designation}
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.lastScanBadge,
+                  lastScanIncrease ? styles.lastScanBadgeIn : styles.lastScanBadgeOut,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.lastScanBadgeText,
+                    lastScanIncrease ? styles.lastScanBadgeTextIn : styles.lastScanBadgeTextOut,
+                  ]}
+                >
+                  {lastScanIncrease ? `+${lastScanQty}` : `−${lastScanQty}`}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.lastScanPlaceholder} />
+          )}
+
+          <View style={styles.controlsRow}>
+            <MouvementButton method={method} setMethod={handleMethodChange} />
+            <Pressable
+              style={styles.closeBtn}
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace("/(tabs)");
+                }
+              }}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Fermer la caméra"
+            >
+              <CloseIcon width={22} height={22} accessible={false} />
+            </Pressable>
+          </View>
+        </Animated.View>
+      </Animated.View>
+
+      {/* Covers camera cold-start so the handoff stays continuous with Accueil. */}
+      <Animated.View pointerEvents="none" style={[styles.veil, { opacity: veilOpacity }]} />
+
       <ScanLoader visible={isProcessing || isBadgeProcessing} />
     </View>
   );
@@ -382,122 +417,164 @@ export default function Scanner() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#1C2529",
     justifyContent: "center",
   },
   message: {
     textAlign: "center",
     paddingBottom: 10,
+    color: colors.WHITE,
   },
   camera: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  veil: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#1C2529",
+    zIndex: 20,
+  },
+  overlay: {
     flex: 1,
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    zIndex: 30,
   },
-  banner: {
-    backgroundColor: "transparent",
-    position: "absolute",
-    top: 50,
-    width: "100%",
-  },
-  button: {
-    flex: 1,
-    alignItems: "center",
-  },
-  text: {
+  topRow: {
     flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    // Root layout already reserves the status-bar inset — keep a tiny gap only.
+    paddingTop: 8,
+  },
+  accountChip: {
+    height: 44,
+    paddingHorizontal: 14,
+    borderRadius: 22,
+    backgroundColor: CHIP_BG,
     alignItems: "center",
-    gap: 10,
-  },
-  stats: {
-    gap: 5,
-  },
-  foot: {
-    width: "100%",
-    height: 140,
-    position: "absolute",
-    bottom: 0,
-    backgroundColor: " rgba(51, 59, 63, 0.7)",
-    paddingHorizontal: 10,
-    justifyContent: "space-evenly",
-  },
-  info: {
-    flexDirection: "row",
-    justifyContent: "flex-start",
-    alignItems: "center",
-    gap: 8,
-  },
-  scannerDisabledOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
     justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1,
+    maxWidth: "55%",
   },
-  scannerDisabledText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
-    textAlign: "center",
+  accountChipText: {
+    color: colors.WHITE,
+    fontSize: 14,
+    fontFamily: "SemiBold",
+    fontWeight: "700",
   },
-  scanAreaOverlay: {
+  bannerWrap: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 110,
+    left: 16,
+    right: 16,
   },
-  scanAreaTop: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  scanAreaMiddle: {
-    flexDirection: "row",
-    height: 250,
-  },
-  scanAreaSide: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  scanBox: {
-    width: 250,
+  viewfinder: {
+    alignSelf: "center",
+    width: 280,
+    height: 200,
     position: "relative",
-    // borderWidth: 2,
-    // borderColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  scanAreaBottom: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   corner: {
     position: "absolute",
-    width: 30,
+    width: 38,
+    height: 38,
+    borderColor: colors.WHITE,
+  },
+  cornerTL: {
+    top: 0,
+    left: 0,
+    borderTopWidth: 4,
+    borderLeftWidth: 4,
+    borderTopLeftRadius: 14,
+  },
+  cornerTR: {
+    top: 0,
+    right: 0,
+    borderTopWidth: 4,
+    borderRightWidth: 4,
+    borderTopRightRadius: 14,
+  },
+  cornerBL: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: 4,
+    borderLeftWidth: 4,
+    borderBottomLeftRadius: 14,
+  },
+  cornerBR: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: 4,
+    borderRightWidth: 4,
+    borderBottomRightRadius: 14,
+  },
+  bottomBlock: {
+    gap: 12,
+  },
+  lastScanCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: colors.WHITE,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  lastScanPlaceholder: {
+    height: 0,
+  },
+  lastScanText: {
+    flex: 1,
+  },
+  lastScanLabel: {
+    color: colors.MUTED,
+    fontSize: 12,
+    fontFamily: "SemiBold",
+    fontWeight: "600",
+  },
+  lastScanName: {
+    color: colors.DARK,
+    fontSize: 14,
+    fontFamily: "SemiBold",
+    fontWeight: "700",
+  },
+  lastScanBadge: {
+    minWidth: 52,
     height: 30,
-    borderColor: colors.GREEN,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
   },
-  cornerTopLeft: {
-    top: -2,
-    left: -2,
-    borderTopWidth: 4,
-    borderLeftWidth: 4,
+  lastScanBadgeIn: {
+    backgroundColor: colors.INCREASE_BG,
   },
-  cornerTopRight: {
-    top: -2,
-    right: -2,
-    borderTopWidth: 4,
-    borderRightWidth: 4,
+  lastScanBadgeOut: {
+    backgroundColor: colors.DECREASE_BG,
   },
-  cornerBottomLeft: {
-    bottom: -2,
-    left: -2,
-    borderBottomWidth: 4,
-    borderLeftWidth: 4,
+  lastScanBadgeText: {
+    fontSize: 14,
+    fontFamily: "SemiBold",
+    fontWeight: "800",
   },
-  cornerBottomRight: {
-    bottom: -2,
-    right: -2,
-    borderBottomWidth: 4,
-    borderRightWidth: 4,
+  lastScanBadgeTextIn: {
+    color: colors.INCREASE_TEXT,
+  },
+  lastScanBadgeTextOut: {
+    color: colors.DECREASE_TEXT,
+  },
+  controlsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  closeBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.WHITE,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

@@ -38,7 +38,39 @@ function AppStack() {
         name="scanner"
         options={{
           presentation: "card",
+          animation: "fade",
+          contentStyle: { backgroundColor: "#1C2529" },
+        }}
+      />
+      <Stack.Screen
+        name="commandes/[id]"
+        options={{
+          presentation: "card",
           animation: "slide_from_right",
+        }}
+      />
+      <Stack.Screen
+        name="commandes/reception/[id]"
+        options={{
+          presentation: "card",
+          animation: "fade",
+          contentStyle: { backgroundColor: "#1C2529" },
+        }}
+      />
+      <Stack.Screen
+        name="commandes/reception/confirmee/[id]"
+        options={{
+          presentation: "card",
+          animation: "slide_from_bottom",
+          contentStyle: { backgroundColor: colors.SURFACE },
+        }}
+      />
+      <Stack.Screen
+        name="stock/[id]"
+        options={{
+          presentation: "card",
+          animation: "slide_from_right",
+          contentStyle: { backgroundColor: colors.SURFACE },
         }}
       />
     </Stack>

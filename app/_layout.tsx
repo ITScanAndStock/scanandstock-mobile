@@ -7,6 +7,7 @@ import Toast from "react-native-toast-message";
 
 // import expo
 import { useFonts } from "expo-font";
+import { usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 
 // import components
@@ -19,6 +20,9 @@ import RootNavigator from "./RootNavigator";
 
 function RootLayoutContent() {
   const { isAuthenticated, isLoading } = useAuth();
+  const pathname = usePathname();
+  const hideChromeHeader =
+    pathname?.includes("scanner") || pathname?.includes("reception");
   const [appIsReady, setAppIsReady] = useState(false);
   const [fontsLoaded, fontsError] = useFonts({
     Montserrat: require("../assets/fonts/Montserrat-Regular.ttf"),
@@ -47,20 +51,20 @@ function RootLayoutContent() {
       <View
         style={{
           height: insets.top,
-          backgroundColor: "#28343B",
+          backgroundColor: "#27333A",
         }}
       >
         <StatusBar style="light" />
       </View>
       <View style={{ flex: 1 }}>
-        {isAuthenticated && <Header />}
+        {isAuthenticated && !hideChromeHeader && <Header />}
         <RootNavigator />
         <Toast />
       </View>
       <View
         style={{
           height: insets.bottom,
-          backgroundColor: "#fff",
+          backgroundColor: hideChromeHeader ? "#1C2529" : "#fff",
         }}
       ></View>
     </>

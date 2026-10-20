@@ -1,74 +1,84 @@
-import { colors } from '@/constants/colors';
-import { useAccount } from '@/context/AccountContext';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Pressable, StyleSheet, View } from 'react-native';
-import ThemedText from './ThemedText';
+import { colors } from "@/constants/colors";
+import { useAccount } from "@/context/AccountContext";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 interface BadgesScannedProps {
-	name: string;
+  name: string;
+  /** Darker chip for camera overlay (matches account pill). */
+  tone?: "default" | "overlay";
 }
 
-export default function BadgesScanned({ name }: BadgesScannedProps) {
-	const { resetBadge } = useAccount();
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+}
 
-	const handlePress = () => {
-		resetBadge();
-	};
+function shortName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0]} ${parts[1][0]}.`;
+  }
+  return name;
+}
 
-	return (
-		<View style={styles.container}>
-			<View>
-				<ThemedText
-					variant="regularText"
-					color="WHITE"
-				>
-					Vous êtes identifié en tant que :
-				</ThemedText>
-				<ThemedText
-					variant="regularText"
-					color="WHITE"
-				>
-					{name}
-				</ThemedText>
-			</View>
+export default function BadgesScanned({ name, tone = "default" }: BadgesScannedProps) {
+  const { resetBadge } = useAccount();
 
-			<Pressable
-				onPress={handlePress}
-				style={styles.btn}
-				accessible={true}
-				accessibilityLabel="Déconnexion"
-				accessibilityRole="button"
-				accessibilityHint="Appuyez pour vous déconnecter"
-			>
-				<FontAwesome
-					name="power-off"
-					size={30}
-					color={colors.GREEN}
-					accessible={false}
-				/>
-			</Pressable>
-		</View>
-	);
+  return (
+    <Pressable
+      onPress={resetBadge}
+      style={[styles.container, tone === "overlay" && styles.containerOverlay]}
+      accessible={true}
+      accessibilityLabel={`Badge connecté : ${name}, appuyer pour changer`}
+      accessibilityRole="button"
+      accessibilityHint="Appuyez pour vous déconnecter du badge"
+    >
+      <View style={styles.avatar}>
+        <Text style={styles.initials}>{getInitials(name)}</Text>
+      </View>
+      <Text style={styles.name} numberOfLines={1}>
+        {shortName(name)}
+      </Text>
+    </Pressable>
+  );
 }
 
 const styles = StyleSheet.create({
-	container: {
-		backgroundColor: colors.GREEN,
-		flexDirection: 'row',
-		width: '100%',
-		padding: 12,
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		marginVertical: 10,
-		gap: 10,
-		borderRadius: 10,
-	},
-	btn: {
-		width: 50,
-		height: 50,
-		backgroundColor: colors.WHITE,
-		borderRadius: 10,
-		justifyContent: 'center',
-		alignItems: 'center',
-	},
+  container: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    height: 44,
+    paddingLeft: 6,
+    paddingRight: 14,
+    borderRadius: 22,
+    backgroundColor: colors.PILL,
+  },
+  containerOverlay: {
+    backgroundColor: "rgba(22,30,34,0.72)",
+  },
+  avatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.BADGE_AVATAR,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  initials: {
+    color: colors.DARK,
+    fontSize: 12,
+    fontFamily: "SemiBold",
+    fontWeight: "800",
+  },
+  name: {
+    color: colors.WHITE,
+    fontSize: 14,
+    fontFamily: "SemiBold",
+    fontWeight: "600",
+    maxWidth: 100,
+  },
 });
