@@ -41,6 +41,7 @@ const audioSourceSucces = require("../assets/sounds/ok.mp3");
 const audioSourceError = require("../assets/sounds/error.mp3");
 const INITIAL_METHOD = Method.decrease;
 const BANNER_DURATION_MS = 5000;
+const OVERLAY_CARD_MAX_WIDTH = 560;
 
 export type ScannerViewHandle = {
   open: () => void;
@@ -371,7 +372,9 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
 
         {showBanner && method === Method.decrease ? (
           <View style={styles.bannerWrap}>
-            <InformationBanner title="Attention la sortie de stock est activée" />
+            <View style={styles.bannerCard}>
+              <InformationBanner title="Attention la sortie de stock est activée" />
+            </View>
           </View>
         ) : null}
 
@@ -480,6 +483,11 @@ const styles = StyleSheet.create({
     top: 110,
     left: 16,
     right: 16,
+    alignItems: "center",
+  },
+  bannerCard: {
+    width: "100%",
+    maxWidth: OVERLAY_CARD_MAX_WIDTH,
   },
   viewfinder: {
     alignSelf: "center",
@@ -525,6 +533,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   lastScanCard: {
+    alignSelf: "center",
+    width: "100%",
+    maxWidth: OVERLAY_CARD_MAX_WIDTH,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -571,6 +582,9 @@ const styles = StyleSheet.create({
     color: colors.DECREASE_TEXT,
   },
   controlsRow: {
+    alignSelf: "center",
+    width: "100%",
+    maxWidth: OVERLAY_CARD_MAX_WIDTH,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,

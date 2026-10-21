@@ -7,9 +7,11 @@ import Toast from "react-native-toast-message";
 
 // import expo
 import { useFonts } from "expo-font";
+import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
 
 // import components
+import { isTablet } from "@/constants/layout";
 import { AccountProvider } from "@/context/AccountContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { StatsProvider } from "@/context/StatsContext";
@@ -57,6 +59,12 @@ function RootLayoutContent() {
 }
 
 export default function RootLayout() {
+  useEffect(() => {
+    if (!isTablet()) {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+    }
+  }, []);
+
   return (
     <AuthProvider>
       <AccountProvider>

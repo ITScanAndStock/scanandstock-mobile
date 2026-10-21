@@ -33,7 +33,7 @@ export default {
     name: IS_PREVIEW ? "ScanAndStock (Staging)" : "Scan&Stock",
     slug: "scanandstock",
     version: "1.0.7",
-    orientation: "portrait",
+    orientation: "default",
     icon: "./assets/images/splash-icon.png",
     scheme: "scanandstock",
     userInterfaceStyle: "automatic",

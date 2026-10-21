@@ -8,6 +8,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,9 +20,10 @@ import ScanBadge from "../../components/ScanBadge";
 import ScannerView, { ScannerViewHandle } from "../../components/ScannerView";
 import MovementRow, { MOVEMENT_ROW_HEIGHT } from "../../components/ui-components/MovementRow";
 import { colors } from "@/constants/colors";
+import { isTablet } from "@/constants/layout";
 import { useStats } from "@/hooks/useStats";
 
-const VISIBLE_MOVEMENTS = 3;
+const PHONE_VISIBLE_MOVEMENTS = 3;
 const OPEN_DURATION_MS = 500;
 const CLOSE_DURATION_MS = 400;
 
@@ -29,6 +31,9 @@ export default function Scan() {
   const { stats, isLoading } = useStats();
   const recentStats = stats?.slice(0, 5) ?? [];
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
+  const tablet = isTablet();
   const scannerRef = useRef<ScannerViewHandle>(null);
   const [isCameraOpen, setCameraOpen] = useState(false);
   const [progress] = useState(() => new Animated.Value(0));
@@ -71,9 +76,9 @@ export default function Scan() {
     return () => subscription.remove();
   }, [isCameraOpen, closeCamera]);
 
-  const movementsTranslateY = progress.interpolate({
+  const movementsOffset = progress.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 520],
+    outputRange: [0, isLandscape ? width : height],
   });
   const movementsOpacity = progress.interpolate({
     inputRange: [0, 0.55, 1],
@@ -91,7 +96,7 @@ export default function Scan() {
   });
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isLandscape && styles.containerLandscape]}>
       <Animated.View
         style={[StyleSheet.absoluteFill, { opacity: cameraOpacity }]}
         pointerEvents={isCameraOpen ? "box-none" : "none"}
@@ -102,7 +107,7 @@ export default function Scan() {
       </Animated.View>
 
       <Animated.View
-        style={[styles.topSection, { opacity: homeOpacity }]}
+        style={[styles.topSection, isLandscape && styles.topSectionLandscape, { opacity: homeOpacity }]}
         pointerEvents={isCameraOpen ? "none" : "box-none"}
         importantForAccessibility={isCameraOpen ? "no-hide-descendants" : "auto"}
         accessibilityElementsHidden={isCameraOpen}
@@ -138,10 +143,11 @@ export default function Scan() {
       <Animated.View
         style={[
           styles.movementsPanel,
+          isLandscape && styles.movementsPanelLandscape,
           {
             paddingBottom: 8 + insets.bottom,
             opacity: movementsOpacity,
-            transform: [{ translateY: movementsTranslateY }],
+            transform: [isLandscape ? { translateX: movementsOffset } : { translateY: movementsOffset }],
           },
         ]}
         pointerEvents={isCameraOpen ? "none" : "auto"}
@@ -168,7 +174,7 @@ export default function Scan() {
             data={recentStats}
             keyExtractor={(item, index) => `${item.designation}-${item.mvmtDateTime}-${index}`}
             renderItem={({ item }) => <MovementRow item={item} />}
-            style={styles.movementsList}
+            style={tablet ? undefined : styles.movementsList}
             ListEmptyComponent={<Text style={styles.emptyText}>Aucun mouvement récent</Text>}
           />
         )}
@@ -182,6 +188,18 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.DARK,
     overflow: "hidden",
+  },
+  containerLandscape: {
+    flexDirection: "row",
+  },
+  topSectionLandscape: {
+    flex: 0,
+    width: "40%",
+  },
+  movementsPanelLandscape: {
+    flex: 1,
+    borderTopRightRadius: 0,
+    borderBottomLeftRadius: 28,
   },
   topSection: {
     flex: 1,
@@ -266,7 +284,7 @@ export const styles = StyleSheet.create({
     fontFamily: "Montserrat",
   },
   movementsList: {
-    maxHeight: VISIBLE_MOVEMENTS * MOVEMENT_ROW_HEIGHT,
+    maxHeight: PHONE_VISIBLE_MOVEMENTS * MOVEMENT_ROW_HEIGHT,
   },
   loader: {
     marginTop: 24,
