@@ -1,6 +1,16 @@
 export const colors = {
   DARK: "#27333A",
   GREEN: "#12A19A",
+  GREEN_DARK: "#0E7C76",
   WHITE: "#ffffff",
-  GREY: "#28343B"
-}
+  GREY: "#28343B",
+  MUTED: "#56636B",
+  BORDER: "#EDF0F1",
+  PILL: "rgba(255,255,255,0.1)",
+  PILL_OVERLAY: "rgba(22,30,34,0.72)",
+  BADGE_AVATAR: "#5CC8C1",
+  DECREASE_BG: "#FBEDE3",
+  DECREASE_TEXT: "#C62828",
+  INCREASE_BG: "#E3F3F2",
+  INCREASE_TEXT: "#0B6C67",
+};

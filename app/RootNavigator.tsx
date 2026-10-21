@@ -34,13 +34,6 @@ function AppStack() {
           animation: "slide_from_left",
         }}
       />
-      <Stack.Screen
-        name="scanner"
-        options={{
-          presentation: "card",
-          animation: "slide_from_right",
-        }}
-      />
     </Stack>
   );
 }

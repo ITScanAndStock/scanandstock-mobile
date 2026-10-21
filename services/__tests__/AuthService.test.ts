@@ -45,9 +45,11 @@ vi.mock("../../config/KeycloakConfig", () => ({
 vi.mock("expo-auth-session", () => {
   class TokenError extends Error {
     code: string;
+    params: { error: string };
     constructor(params: { error: string }) {
       super(params.error);
       this.code = params.error;
+      this.params = params;
     }
   }
   return {

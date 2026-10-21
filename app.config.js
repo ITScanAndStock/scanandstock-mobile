@@ -33,7 +33,7 @@ export default {
     name: IS_PREVIEW ? "ScanAndStock (Staging)" : "Scan&Stock",
     slug: "scanandstock",
     version: "1.0.7",
-    orientation: "portrait",
+    orientation: "default",
     icon: "./assets/images/splash-icon.png",
     scheme: "scanandstock",
     userInterfaceStyle: "automatic",
@@ -54,7 +54,6 @@ export default {
         foregroundImage: "./assets/images/android-app-icon.png",
         monochromeImage: "./assets/images/android-app-icon.png",
       },
-      edgeToEdgeEnabled: true,
       package: "com.scanandstock.scanandstock",
       predictiveBackGestureEnabled: false,
       permissions: ["CAMERA"],
@@ -85,6 +84,11 @@ export default {
     },
     plugins: [
       "expo-router",
+      "expo-asset",
+      "expo-font",
+      "expo-image",
+      "expo-status-bar",
+      "expo-web-browser",
       [
         "expo-camera",
         {
