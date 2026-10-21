@@ -1,5 +1,6 @@
 // import expo
 import { Tabs } from "expo-router";
+import { useMemo } from "react";
 
 // import svg and icons
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -7,6 +8,8 @@ import type { ComponentProps } from "react";
 
 // import constants
 import { colors } from "@/constants/colors";
+import { MOCK_STOCK } from "@/data/mockStock";
+import { isBelowThreshold } from "@/model/StockProduit";
 
 type IconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -21,6 +24,11 @@ function TabIcon({ name, focused }: { name: IconName; focused: boolean }) {
 }
 
 export default function TabLayout() {
+  const belowThresholdCount = useMemo(
+    () => MOCK_STOCK.filter(isBelowThreshold).length,
+    [],
+  );
+
   return (
     <Tabs
       screenOptions={{
@@ -50,6 +58,18 @@ export default function TabLayout() {
         options={{
           title: "Stock",
           tabBarIcon: ({ focused }) => <TabIcon name="layers-outline" focused={focused} />,
+          tabBarBadge: belowThresholdCount > 0 ? belowThresholdCount : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: colors.DECREASE_TEXT,
+            color: colors.WHITE,
+            fontSize: 10,
+            fontFamily: "SemiBold",
+            fontWeight: "700",
+            minWidth: 18,
+            height: 18,
+            lineHeight: 16,
+            borderRadius: 9,
+          },
         }}
       />
       <Tabs.Screen

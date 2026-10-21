@@ -13,6 +13,7 @@ import {
 import CartIcon from "@/assets/images/figma/cart.svg";
 import ChevronLeft from "@/assets/images/figma/chevron-left.svg";
 import EditIcon from "@/assets/images/figma/edit.svg";
+import QuantityNumPadSheet from "@/components/QuantityNumPadSheet";
 import { colors } from "@/constants/colors";
 import { getStockProduitById } from "@/data/mockStock";
 import { formatPurchasePrice, getActiveLots, getUsedLots, StockLot } from "@/model/StockProduit";
@@ -40,6 +41,7 @@ export default function StockProduitFiche() {
   const [quantity, setQuantity] = useState(produit?.quantity ?? 0);
   const [tab, setTab] = useState<LotTab>("stock");
   const [tabWidth, setTabWidth] = useState(0);
+  const [numPadOpen, setNumPadOpen] = useState(false);
   const indicatorX = useRef(new Animated.Value(0)).current;
   const lotsOpacity = useRef(new Animated.Value(1)).current;
 
@@ -163,6 +165,7 @@ export default function StockProduitFiche() {
 
             <Pressable
               style={styles.qtyInputBtn}
+              onPress={() => setNumPadOpen(true)}
               accessible={true}
               accessibilityRole="button"
               accessibilityLabel="Saisir une quantité à retirer ou ajouter"
@@ -296,6 +299,13 @@ export default function StockProduitFiche() {
           <Text style={styles.cartLabel}>Ajouter au panier</Text>
         </Pressable>
       </View>
+
+      <QuantityNumPadSheet
+        visible={numPadOpen}
+        onClose={() => setNumPadOpen(false)}
+        onAdd={(qty) => setQuantity((current) => current + qty)}
+        onRemove={(qty) => setQuantity((current) => Math.max(0, current - qty))}
+      />
     </View>
   );
 }

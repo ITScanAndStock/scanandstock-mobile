@@ -54,7 +54,6 @@ export default {
         foregroundImage: "./assets/images/android-app-icon.png",
         monochromeImage: "./assets/images/android-app-icon.png",
       },
-      edgeToEdgeEnabled: true,
       package: "com.scanandstock.scanandstock",
       predictiveBackGestureEnabled: false,
       permissions: ["CAMERA"],
@@ -85,6 +84,11 @@ export default {
     },
     plugins: [
       "expo-router",
+      "expo-asset",
+      "expo-font",
+      "expo-image",
+      "expo-status-bar",
+      "expo-web-browser",
       [
         "expo-camera",
         {
