@@ -7,13 +7,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 
 import CartIcon from "@/assets/images/figma/cart.svg";
 import ChevronLeft from "@/assets/images/figma/chevron-left.svg";
 import EditIcon from "@/assets/images/figma/edit.svg";
-import QuantityNumPadSheet from "@/components/QuantityNumPadSheet";
 import { colors } from "@/constants/colors";
 import { getStockProduitById } from "@/data/mockStock";
 import { formatPurchasePrice, getActiveLots, getUsedLots, StockLot } from "@/model/StockProduit";
@@ -41,7 +41,9 @@ export default function StockProduitFiche() {
   const [quantity, setQuantity] = useState(produit?.quantity ?? 0);
   const [tab, setTab] = useState<LotTab>("stock");
   const [tabWidth, setTabWidth] = useState(0);
-  const [numPadOpen, setNumPadOpen] = useState(false);
+  const [editingQty, setEditingQty] = useState(false);
+  const [qtyDraft, setQtyDraft] = useState("");
+  const qtyInputRef = useRef<TextInput>(null);
   const indicatorX = useRef(new Animated.Value(0)).current;
   const lotsOpacity = useRef(new Animated.Value(1)).current;
 
@@ -87,6 +89,27 @@ export default function StockProduitFiche() {
       }),
     ]).start();
     setTab(next);
+  };
+
+  useEffect(() => {
+    if (editingQty) {
+      const id = setTimeout(() => qtyInputRef.current?.focus(), 50);
+      return () => clearTimeout(id);
+    }
+  }, [editingQty]);
+
+  const openQtyInput = () => {
+    setQtyDraft("");
+    setEditingQty(true);
+  };
+
+  const commitQtyInput = () => {
+    const parsed = Number.parseInt(qtyDraft, 10);
+    if (!Number.isNaN(parsed) && parsed >= 0) {
+      setQuantity(parsed);
+    }
+    setEditingQty(false);
+    setQtyDraft("");
   };
 
   if (!produit) {
@@ -150,7 +173,25 @@ export default function StockProduitFiche() {
               </Pressable>
               <View style={styles.stockCenter}>
                 <Text style={styles.stockLabel}>En stock</Text>
-                <Text style={[styles.stockQty, below && styles.stockQtyAlert]}>{quantity}</Text>
+                {editingQty ? (
+                  <TextInput
+                    ref={qtyInputRef}
+                    style={[styles.stockQty, styles.stockQtyInput, below && styles.stockQtyAlert]}
+                    value={qtyDraft}
+                    onChangeText={(text) => setQtyDraft(text.replace(/[^0-9]/g, ""))}
+                    onBlur={commitQtyInput}
+                    onSubmitEditing={commitQtyInput}
+                    keyboardType="number-pad"
+                    returnKeyType="done"
+                    placeholder="0"
+                    placeholderTextColor={colors.MUTED}
+                    selectTextOnFocus
+                    accessible={true}
+                    accessibilityLabel="Quantité en stock"
+                  />
+                ) : (
+                  <Text style={[styles.stockQty, below && styles.stockQtyAlert]}>{quantity}</Text>
+                )}
               </View>
               <Pressable
                 style={styles.plusBtn}
@@ -165,10 +206,10 @@ export default function StockProduitFiche() {
 
             <Pressable
               style={styles.qtyInputBtn}
-              onPress={() => setNumPadOpen(true)}
+              onPress={openQtyInput}
               accessible={true}
               accessibilityRole="button"
-              accessibilityLabel="Saisir une quantité à retirer ou ajouter"
+              accessibilityLabel="Saisir une quantité"
             >
               <Text style={styles.qtyInputLabel}>Saisir une quantité</Text>
             </Pressable>
@@ -300,12 +341,6 @@ export default function StockProduitFiche() {
         </Pressable>
       </View>
 
-      <QuantityNumPadSheet
-        visible={numPadOpen}
-        onClose={() => setNumPadOpen(false)}
-        onAdd={(qty) => setQuantity((current) => current + qty)}
-        onRemove={(qty) => setQuantity((current) => Math.max(0, current - qty))}
-      />
     </View>
   );
 }
@@ -431,6 +466,11 @@ const styles = StyleSheet.create({
   },
   stockQtyAlert: {
     color: colors.DECREASE_TEXT,
+  },
+  stockQtyInput: {
+    minWidth: 80,
+    padding: 0,
+    textAlign: "center",
   },
   qtyInputBtn: {
     width: "100%",
