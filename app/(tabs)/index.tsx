@@ -1,98 +1,178 @@
-// import reacts native
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Animated,
+  BackHandler,
+  Easing,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// import expo
-import { LinearGradient } from "expo-linear-gradient";
-import { Link } from "expo-router";
-
-// import svg and icons
-import Badge from "../../assets/images/badge.svg";
-import QrCode from "../../assets/images/qr-code.svg";
-import ScanLine from "../../assets/images/scan-line.svg";
-
-// import components
+import ScanProductIcon from "../../assets/images/figma/scan-product.svg";
 import ChoosAccount from "../../components/ChooseAccount";
+import Header from "../../components/Header";
 import ScanBadge from "../../components/ScanBadge";
-import ThemedText from "../../components/ui-components/ThemedText";
-
-// importe constants
+import ScannerView, { ScannerViewHandle } from "../../components/ScannerView";
+import MovementRow, { MOVEMENT_ROW_HEIGHT } from "../../components/ui-components/MovementRow";
 import { colors } from "@/constants/colors";
-import { useAccount } from "@/context/AccountContext";
 import { useStats } from "@/hooks/useStats";
-import Stat from "../../components/ui-components/Stat";
+
+const VISIBLE_MOVEMENTS = 3;
+const OPEN_DURATION_MS = 500;
+const CLOSE_DURATION_MS = 400;
 
 export default function Scan() {
-  const { isTracingEnabled, activeBadgeId } = useAccount();
   const { stats, isLoading } = useStats();
+  const recentStats = stats?.slice(0, 5) ?? [];
+  const insets = useSafeAreaInsets();
+  const scannerRef = useRef<ScannerViewHandle>(null);
+  const [isCameraOpen, setCameraOpen] = useState(false);
+  const [progress] = useState(() => new Animated.Value(0));
+
+  const animateTo = useCallback(
+    (toValue: number, duration: number) => {
+      Animated.timing(progress, {
+        toValue,
+        duration,
+        easing: Easing.bezier(0.33, 0.0, 0.2, 1),
+        useNativeDriver: true,
+      }).start();
+    },
+    [progress],
+  );
+
+  const openCamera = () => {
+    if (isCameraOpen) {
+      return;
+    }
+    scannerRef.current?.open();
+    setCameraOpen(true);
+    animateTo(1, OPEN_DURATION_MS);
+  };
+
+  const closeCamera = useCallback(() => {
+    scannerRef.current?.close();
+    setCameraOpen(false);
+    animateTo(0, CLOSE_DURATION_MS);
+  }, [animateTo]);
+
+  useEffect(() => {
+    if (!isCameraOpen) {
+      return;
+    }
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      closeCamera();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [isCameraOpen, closeCamera]);
+
+  const movementsTranslateY = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 520],
+  });
+  const movementsOpacity = progress.interpolate({
+    inputRange: [0, 0.55, 1],
+    outputRange: [1, 0.7, 0],
+  });
+  const homeOpacity = progress.interpolate({
+    inputRange: [0, 0.6],
+    outputRange: [1, 0],
+    extrapolate: "clamp",
+  });
+  const cameraOpacity = progress.interpolate({
+    inputRange: [0.25, 1],
+    outputRange: [0, 1],
+    extrapolate: "clamp",
+  });
 
   return (
     <View style={styles.container}>
-      <ChoosAccount />
-      {isTracingEnabled && activeBadgeId === null ? (
-        <Badge
-          width={160}
-          height={160}
-          style={styles.svg}
-          accessible={true}
-          accessibilityLabel="Scanner votre badge"
-          accessibilityRole="image"
-        />
-      ) : (
-        <QrCode
-          width={140}
-          height={140}
-          style={styles.svg}
-          accessible={true}
-          accessibilityLabel="Scanner un produit"
-          accessibilityRole="image"
-        />
-      )}
-
-      {isTracingEnabled === true ? <ScanBadge /> : null}
-
-      <Link
-        style={styles.btn}
-        href="/scanner"
-        accessible={true}
-        accessibilityLabel="Scanner un produit"
-        accessibilityHint="Ouvre la caméra pour scanner un code-barres"
-        accessibilityRole="button"
+      <Animated.View
+        style={[StyleSheet.absoluteFill, { opacity: cameraOpacity }]}
+        pointerEvents={isCameraOpen ? "box-none" : "none"}
+        importantForAccessibility={isCameraOpen ? "auto" : "no-hide-descendants"}
+        accessibilityElementsHidden={!isCameraOpen}
       >
-        <View style={styles.btnContent}>
-          <ScanLine
-            width={24}
-            height={24}
-            accessible={false}
-            importantForAccessibility="no"
-          />
-          <ThemedText variant="textBtn"> scannez</ThemedText>
+        <ScannerView ref={scannerRef} active={isCameraOpen} onClose={closeCamera} />
+      </Animated.View>
+
+      <Animated.View
+        style={[styles.topSection, { opacity: homeOpacity }]}
+        pointerEvents={isCameraOpen ? "none" : "box-none"}
+        importantForAccessibility={isCameraOpen ? "no-hide-descendants" : "auto"}
+        accessibilityElementsHidden={isCameraOpen}
+      >
+        <Header />
+
+        <View style={styles.pillsRow}>
+          <ChoosAccount />
+          <ScanBadge />
         </View>
-      </Link>
-      <View
-        style={styles.historyContainer}
+
+        <View style={styles.scanBlock}>
+          <Pressable
+            style={styles.scanButton}
+            onPress={openCamera}
+            accessible={true}
+            accessibilityLabel="Scanner un produit"
+            accessibilityHint="Ouvre la caméra pour scanner un code-barres"
+            accessibilityRole="button"
+          >
+            <View style={styles.scanGlowOuter}>
+              <View style={styles.scanGlowInner}>
+                <View style={styles.scanCircle}>
+                  <ScanProductIcon width={68} height={68} accessible={false} />
+                </View>
+              </View>
+            </View>
+          </Pressable>
+          <Text style={styles.scanLabel}>Scanner un produit</Text>
+        </View>
+      </Animated.View>
+
+      <Animated.View
+        style={[
+          styles.movementsPanel,
+          {
+            paddingBottom: 8 + insets.bottom,
+            opacity: movementsOpacity,
+            transform: [{ translateY: movementsTranslateY }],
+          },
+        ]}
+        pointerEvents={isCameraOpen ? "none" : "auto"}
+        importantForAccessibility={isCameraOpen ? "no-hide-descendants" : "auto"}
+        accessibilityElementsHidden={isCameraOpen}
         accessible={true}
-        accessibilityLabel="Historique des dernières statistiques"
+        accessibilityLabel="Derniers mouvements"
         accessibilityRole="list"
       >
-        {stats && (
-          <LinearGradient
-            style={styles.backgroundGradient}
-            colors={["#12A19A40", "#12A19A1C"]}
-          >
-            {isLoading ? (
-              <ActivityIndicator
-                size="large"
-                color={colors.DARK}
-                accessibilityLabel="Chargement des statistiques"
-              />
-            ) : (
-              stats?.map((stat, index) => {
-                return <Stat key={index} {...stat} />;
-              })
-            )}
-          </LinearGradient>
+        <View style={styles.movementsHeader}>
+          <Text style={styles.movementsTitle}>Derniers mouvements</Text>
+          <Text style={styles.movementsSubtitle}>5 derniers</Text>
+        </View>
+
+        {isLoading ? (
+          <ActivityIndicator
+            size="large"
+            color={colors.DARK}
+            style={styles.loader}
+            accessibilityLabel="Chargement des mouvements"
+          />
+        ) : (
+          <FlatList
+            data={recentStats}
+            keyExtractor={(item, index) => `${item.designation}-${item.mvmtDateTime}-${index}`}
+            renderItem={({ item }) => <MovementRow item={item} />}
+            style={styles.movementsList}
+            ListEmptyComponent={<Text style={styles.emptyText}>Aucun mouvement récent</Text>}
+          />
         )}
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -100,48 +180,102 @@ export default function Scan() {
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 12,
+    backgroundColor: colors.DARK,
+    overflow: "hidden",
   },
-  svg: {
-    marginTop: 50,
-    marginBottom: 20,
-  },
-  btn: {
-    width: "100%",
-    maxWidth: 400,
-    borderWidth: 3,
-    borderColor: colors.DARK,
-    borderRadius: 25,
-    padding: 10,
-    textAlign: "center",
-  },
-  btnContent: {
-    width: "100%",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-  },
-  historyContainer: {
-    width: "100%",
-    maxWidth: 500,
-    padding: 10,
-    boxSizing: "border-box",
-    justifyContent: "space-around",
+  topSection: {
     flex: 1,
-    maxHeight: 400,
+    paddingHorizontal: 20,
+    gap: 18,
+    zIndex: 10,
+    overflow: "visible",
   },
-  backgroundGradient: {
-    width: "100%",
-    height: "80%",
-    maxHeight: 250,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    boxSizing: "border-box",
-    justifyContent: "space-around",
+  pillsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    zIndex: 10,
+    overflow: "visible",
+  },
+  scanBlock: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
-    borderRadius: 15,
+    paddingTop: 22,
+    paddingBottom: 34,
+    gap: 14,
+    minHeight: 250,
+  },
+  scanButton: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scanGlowOuter: {
+    width: 216,
+    height: 216,
+    borderRadius: 108,
+    backgroundColor: "rgba(18,161,154,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scanGlowInner: {
+    width: 188,
+    height: 188,
+    borderRadius: 94,
+    backgroundColor: "rgba(18,161,154,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scanCircle: {
+    width: 164,
+    height: 164,
+    borderRadius: 82,
+    backgroundColor: colors.GREEN_DARK,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scanLabel: {
+    marginTop: 14,
+    color: colors.WHITE,
+    fontSize: 19,
+    fontFamily: "SemiBold",
+  },
+  movementsPanel: {
+    backgroundColor: colors.WHITE,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 18,
+    paddingHorizontal: 20,
+    zIndex: 5,
+  },
+  movementsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  movementsTitle: {
+    color: colors.DARK,
+    fontSize: 16,
+    fontFamily: "SemiBold",
+  },
+  movementsSubtitle: {
+    color: colors.MUTED,
+    fontSize: 12,
+    fontFamily: "Montserrat",
+  },
+  movementsList: {
+    maxHeight: VISIBLE_MOVEMENTS * MOVEMENT_ROW_HEIGHT,
+  },
+  loader: {
+    marginTop: 24,
+  },
+  emptyText: {
+    marginTop: 20,
+    color: colors.MUTED,
+    fontSize: 14,
+    fontFamily: "Montserrat",
+    textAlign: "center",
   },
 });

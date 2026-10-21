@@ -18,7 +18,7 @@ class SessionRejectedError extends Error {}
 // Only an explicit refusal ends the session: network failures and Keycloak outages keep it.
 const isSessionRejected = (error: unknown) =>
   error instanceof SessionRejectedError ||
-  (error instanceof AuthSession.TokenError && error.code === "invalid_grant");
+  (error instanceof AuthSession.TokenError && error.params.error === "invalid_grant");
 
 class AuthService {
   private refreshInFlight: Promise<string> | null = null;
