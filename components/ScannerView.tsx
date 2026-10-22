@@ -36,6 +36,7 @@ import ScanLoader from "./ScanLoader";
 import { useStats } from "../hooks/useStats";
 import { Method } from "../model/Stock";
 import ProductService from "../services/ProductService";
+import { createScanGate } from "../services/ScanGate";
 
 const audioSourceSucces = require("../assets/sounds/ok.mp3");
 const audioSourceError = require("../assets/sounds/error.mp3");
@@ -59,7 +60,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
   const cameraRef = useRef<CameraView>(null);
   const activeRef = useRef(active);
   const insets = useSafeAreaInsets();
-  const [isScanning, setIsScanning] = useState<boolean>(true);
+  const [scanGate] = useState(createScanGate);
 
   const playerSuccess = useAudioPlayer(audioSourceSucces);
   const playerError = useAudioPlayer(audioSourceError);
@@ -84,8 +85,6 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
   );
 
   const { refresh: refreshStats, stats } = useStats();
-  const [scannedCode, setScannedCode] = useState("");
-  const [scanCount, setScanCount] = useState(0);
   const [method, setMethod] = useState(INITIAL_METHOD);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBadgeProcessing, setIsBadgeProcessing] = useState(false);
@@ -93,8 +92,6 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
   const { isTracingEnabled, activeBadgeId, activeAccount, getBadge, resetAfterTimeout } =
     useAccount();
 
-  const processingRef = useRef(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const bannerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const badgeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const badgeProcessingRef = useRef(false);
@@ -125,15 +122,13 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
     () => ({
       open: () => {
         activeRef.current = true;
-        setScannedCode("");
-        setScanCount(0);
-        setIsScanning(true);
+        scanGate.cameraReopened(Date.now());
         handleMethodChange(INITIAL_METHOD);
         cameraRef.current?.resumePreview();
       },
       close: () => {
         activeRef.current = false;
-        for (const timer of [timeoutRef, bannerTimeoutRef, badgeTimeoutRef]) {
+        for (const timer of [bannerTimeoutRef, badgeTimeoutRef]) {
           if (timer.current) {
             clearTimeout(timer.current);
             timer.current = null;
@@ -144,7 +139,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
         cameraRef.current?.pausePreview();
       },
     }),
-    [handleMethodChange],
+    [handleMethodChange, scanGate],
   );
 
   const handleCameraReady = () => {
@@ -158,7 +153,6 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
 
     badgeProcessingRef.current = true;
     setIsBadgeProcessing(true);
-    setIsScanning(false);
     Vibration.vibrate(100);
     try {
       await getBadge(data);
@@ -175,110 +169,81 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
         onClose();
         badgeProcessingRef.current = false;
         setIsBadgeProcessing(false);
-        setIsScanning(true);
       }, 800);
     }
   };
 
   const handleBarcodeScanned = useCallback(
     async (result: BarcodeScanningResult) => {
-      const { data } = result;
+      const decision = scanGate.frame(result.data, Date.now());
 
-      if (!isScanning || !data || processingRef.current) {
-        return;
-      }
-
-      const cleanedCode = data.replace(/\x1D/g, "$");
-
-      if (!cleanedCode || cleanedCode.length < 4 || cleanedCode.length > 100) {
-        if (__DEV__) {
-          console.warn("⚠️ Code-barres invalide (longueur):", cleanedCode);
+      if (decision.kind === "ignore") {
+        if (__DEV__ && decision.reason === "invalid") {
+          console.warn("⚠️ Code-barres invalide (longueur):", result.data);
         }
         return;
       }
 
-      if (cleanedCode !== scannedCode) {
-        setScannedCode(cleanedCode);
-        setScanCount(1);
-        return;
-      }
+      const cleanedCode = decision.code;
+      setIsProcessing(true);
 
-      if (cleanedCode === scannedCode) {
-        if (scanCount >= 2) {
-          processingRef.current = true;
-          setIsProcessing(true);
-          setIsScanning(false);
+      Vibration.vibrate(100);
 
-          Vibration.vibrate(100);
-
-          ProductService.scan(cleanedCode, method)
-            .then(() => {
-              refreshStats();
-              playerSuccess.seekTo(0);
-              playerSuccess.play();
-            })
-            .catch((error: AxiosErrorType) => {
-              if (__DEV__) {
-                console.error("❌ Erreur lors du scan:", error);
-                console.warn("erreur repéré : ", error);
-              }
-
-              if (error.response?.status === 409) {
-                Alert.alert(
-                  "Attention : péremption plus proche détectée",
-                  "Un autre lot de ce produit expire avant celui-ci. Voulez-vous tout de même sortir ce lot ?",
-                  [
-                    {
-                      text: "Annuler",
-                      style: "cancel",
-                      onPress: () => ToastService.info("Vous avez annulé le scan"),
-                    },
-                    {
-                      text: "Forcer la sortie",
-                      style: "destructive",
-                      onPress: () => {
-                        ProductService.scan(cleanedCode, method, true)
-                          .then(() => {
-                            refreshStats();
-                            playerSuccess.seekTo(0);
-                            playerSuccess.play();
-                          })
-                          .catch((forcedError) => {
-                            if (__DEV__) {
-                              console.error("❌ Erreur lors du scan forcé:", forcedError);
-                            }
-                            playerError.seekTo(0);
-                            playerError.play();
-                          });
-                      },
-                    },
-                  ],
-                );
-              } else {
-                playerError.seekTo(0);
-                playerError.play();
-              }
-            })
-            .finally(() => {
-              setIsProcessing(false);
-              processingRef.current = false;
-            });
-
-          setScannedCode("");
-          setScanCount(0);
-
-          if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
+      ProductService.scan(cleanedCode, method)
+        .then(() => {
+          scanGate.sendFinished(true);
+          refreshStats();
+          playerSuccess.seekTo(0);
+          playerSuccess.play();
+        })
+        .catch((error: AxiosErrorType) => {
+          scanGate.sendFinished(false);
+          if (__DEV__) {
+            console.error("❌ Erreur lors du scan:", error);
+            console.warn("erreur repéré : ", error);
           }
-          timeoutRef.current = setTimeout(() => {
-            setIsScanning(true);
-          }, 2000);
-        } else {
-          setScanCount((prev) => prev + 1);
-        }
-      }
+
+          if (error.response?.status === 409) {
+            Alert.alert(
+              "Attention : péremption plus proche détectée",
+              "Un autre lot de ce produit expire avant celui-ci. Voulez-vous tout de même sortir ce lot ?",
+              [
+                {
+                  text: "Annuler",
+                  style: "cancel",
+                  onPress: () => ToastService.info("Vous avez annulé le scan"),
+                },
+                {
+                  text: "Forcer la sortie",
+                  style: "destructive",
+                  onPress: () => {
+                    ProductService.scan(cleanedCode, method, true)
+                      .then(() => {
+                        refreshStats();
+                        playerSuccess.seekTo(0);
+                        playerSuccess.play();
+                      })
+                      .catch((forcedError) => {
+                        if (__DEV__) {
+                          console.error("❌ Erreur lors du scan forcé:", forcedError);
+                        }
+                        playerError.seekTo(0);
+                        playerError.play();
+                      });
+                  },
+                },
+              ],
+            );
+          } else {
+            playerError.seekTo(0);
+            playerError.play();
+          }
+        })
+        .finally(() => {
+          setIsProcessing(false);
+        });
     },
-    [isScanning, scannedCode, scanCount, method, refreshStats, playerSuccess, playerError],
+    [scanGate, method, refreshStats, playerSuccess, playerError],
   );
 
   const barcodeScannerSettings = useMemo(
@@ -289,9 +254,11 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
   );
 
   const handleScan = ({ data }: BarcodeScanningResult) => {
-    if (!activeRef.current || badgeProcessingRef.current || processingRef.current) return;
+    if (!activeRef.current || badgeProcessingRef.current) return;
     if (isTracingEnabled && activeBadgeId === null) {
-      handleBadgeConnexion({ data } as BarcodeScanningResult);
+      if (!scanGate.isBusy()) {
+        handleBadgeConnexion({ data } as BarcodeScanningResult);
+      }
     } else {
       handleBarcodeScanned({ data } as BarcodeScanningResult);
       if (activeBadgeId !== "") {
@@ -302,9 +269,6 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
 
   useEffect(() => {
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
       if (bannerTimeoutRef.current) {
         clearTimeout(bannerTimeoutRef.current);
       }
