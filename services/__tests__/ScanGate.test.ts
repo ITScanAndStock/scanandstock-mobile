@@ -35,6 +35,14 @@ function sends(decisions: ScanDecision[]) {
   return decisions.filter((decision) => decision.kind === "send");
 }
 
+function alternate(gate: ScanGate, codes: string[], from: number, to: number) {
+  const decisions: ScanDecision[] = [];
+  for (let t = from, i = 0; t <= to; t += FRAME_STEP_MS, i++) {
+    decisions.push(gate.frame(codes[i % codes.length], t));
+  }
+  return decisions;
+}
+
 describe("ScanGate", () => {
   it("sends a code on its 3rd consecutive frame, not before (catches: send on the 2nd)", () => {
     const gate = createScanGate();
@@ -207,5 +215,99 @@ describe("ScanGate", () => {
     const decision = gate.frame("AAAA", 300);
 
     expect(decision.kind).toBe("ignore");
+  });
+
+  it("sends nothing during a 5 s alert, nor after cancelling with the conflicting code in view (catches: closing the alert clears the hold, or frames during the alert do not extend it)", () => {
+    const gate = createScanGate();
+    frames(gate, "AAAA", 0, 3);
+
+    gate.alertOpened();
+    const during = alternate(gate, ["AAAA", "BBBB", "BBBB", "BBBB"], 500, 5500);
+    gate.alertCancelled();
+    const after = frames(gate, "AAAA", 5600, 10);
+
+    expect(sends(during)).toEqual([]);
+    expect(sends(after)).toEqual([]);
+  });
+
+  it("blocks on the alert alone, with no send in progress (catches: alertOpened does nothing)", () => {
+    const gate = createScanGate();
+    frames(gate, "AAAA", 0, 3);
+    gate.sendFinished(true);
+
+    gate.alertOpened();
+    const during = alternate(gate, ["AAAA", "BBBB", "BBBB", "BBBB"], 500, 5500);
+    gate.alertCancelled();
+    const after = frames(gate, "AAAA", 5600, 10);
+
+    expect(sends(during)).toEqual([]);
+    expect(sends(after)).toEqual([]);
+  });
+
+  it("sends B on its 3rd frame after the alert is cancelled (catches: the lock stays on)", () => {
+    const gate = createScanGate();
+    frames(gate, "AAAA", 0, 3);
+
+    gate.alertOpened();
+    gate.alertCancelled();
+    const after = frames(gate, "BBBB", 600, 3);
+
+    expect(after.map((decision) => decision.kind)).toEqual(["ignore", "ignore", "send"]);
+  });
+
+  it("ignores a stray sendFinished while the alert is open: 3 frames of B send nothing (catches: sendFinished lifts the lock during the alert)", () => {
+    const gate = createScanGate();
+    frames(gate, "AAAA", 0, 3);
+
+    gate.alertOpened();
+    gate.sendFinished(false);
+    const decisions = frames(gate, "BBBB", 600, 3);
+
+    expect(sends(decisions)).toEqual([]);
+  });
+
+  it("keeps the lock from alertForced to sendFinished, then sends B on its 3rd frame (catches: lock lifted when the alert closes)", () => {
+    const gate = createScanGate();
+    frames(gate, "AAAA", 0, 3);
+    gate.alertOpened();
+
+    gate.alertForced();
+    const during = frames(gate, "BBBB", 600, 3);
+    gate.sendFinished(true);
+    const after = frames(gate, "BBBB", 1000, 3);
+
+    expect(sends(during)).toEqual([]);
+    expect(after.map((decision) => decision.kind)).toEqual(["ignore", "ignore", "send"]);
+  });
+
+  it("holds the forced code still in view after the forced send (catches: the forced send does not hold its code)", () => {
+    const gate = createScanGate();
+    frames(gate, "AAAA", 0, 5);
+    gate.alertOpened();
+    frames(gate, "AAAA", 500, 10);
+
+    gate.alertForced();
+    const during = frames(gate, "AAAA", 1500, 3);
+    gate.sendFinished(true);
+    const after = frames(gate, "AAAA", 1800, 30);
+
+    expect(sends([...during, ...after])).toEqual([]);
+  });
+
+  it("is busy from alertOpened to alertCancelled, and from alertForced to sendFinished", () => {
+    const cancelled = createScanGate();
+    frames(cancelled, "AAAA", 0, 3);
+    cancelled.alertOpened();
+    expect(cancelled.isBusy()).toBe(true);
+    cancelled.alertCancelled();
+    expect(cancelled.isBusy()).toBe(false);
+
+    const forced = createScanGate();
+    frames(forced, "AAAA", 0, 3);
+    forced.alertOpened();
+    forced.alertForced();
+    expect(forced.isBusy()).toBe(true);
+    forced.sendFinished(true);
+    expect(forced.isBusy()).toBe(false);
   });
 });

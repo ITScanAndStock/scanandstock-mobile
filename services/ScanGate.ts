@@ -10,6 +10,9 @@ export type ScanDecision = { kind: "send"; code: string } | { kind: "ignore"; re
 export type ScanGate = {
   frame: (raw: string, now: number) => ScanDecision;
   sendFinished: (ok: boolean) => void;
+  alertOpened: () => void;
+  alertCancelled: () => void;
+  alertForced: () => void;
   cameraReopened: (now: number) => void;
   isBusy: () => boolean;
 };
@@ -18,6 +21,7 @@ export function createScanGate(): ScanGate {
   let candidate: string | null = null;
   let count = 0;
   let busy = false;
+  let alertOpen = false;
   let held: string | null = null;
   let heldLastSeen = 0;
 
@@ -44,7 +48,7 @@ export function createScanGate(): ScanGate {
         }
       }
 
-      if (busy) {
+      if (busy || alertOpen) {
         resetCount();
         return { kind: "ignore" };
       }
@@ -67,10 +71,21 @@ export function createScanGate(): ScanGate {
     sendFinished: () => {
       busy = false;
     },
+    alertOpened: () => {
+      busy = false;
+      alertOpen = true;
+    },
+    alertCancelled: () => {
+      alertOpen = false;
+    },
+    alertForced: () => {
+      alertOpen = false;
+      busy = true;
+    },
     cameraReopened: (now) => {
       resetCount();
       heldLastSeen = Math.max(heldLastSeen, now);
     },
-    isBusy: () => busy,
+    isBusy: () => busy || alertOpen,
   };
 }

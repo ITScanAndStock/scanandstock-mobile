@@ -185,63 +185,63 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
       }
 
       const cleanedCode = decision.code;
-      setIsProcessing(true);
 
-      Vibration.vibrate(100);
+      const sendScan = (force: boolean) => {
+        setIsProcessing(true);
 
-      ProductService.scan(cleanedCode, method)
-        .then(() => {
-          scanGate.sendFinished(true);
-          refreshStats();
-          playerSuccess.seekTo(0);
-          playerSuccess.play();
-        })
-        .catch((error: AxiosErrorType) => {
-          scanGate.sendFinished(false);
-          if (__DEV__) {
-            console.error("❌ Erreur lors du scan:", error);
-            console.warn("erreur repéré : ", error);
-          }
+        Vibration.vibrate(100);
 
-          if (error.response?.status === 409) {
-            Alert.alert(
-              "Attention : péremption plus proche détectée",
-              "Un autre lot de ce produit expire avant celui-ci. Voulez-vous tout de même sortir ce lot ?",
-              [
-                {
-                  text: "Annuler",
-                  style: "cancel",
-                  onPress: () => ToastService.info("Vous avez annulé le scan"),
-                },
-                {
-                  text: "Forcer la sortie",
-                  style: "destructive",
-                  onPress: () => {
-                    ProductService.scan(cleanedCode, method, true)
-                      .then(() => {
-                        refreshStats();
-                        playerSuccess.seekTo(0);
-                        playerSuccess.play();
-                      })
-                      .catch((forcedError) => {
-                        if (__DEV__) {
-                          console.error("❌ Erreur lors du scan forcé:", forcedError);
-                        }
-                        playerError.seekTo(0);
-                        playerError.play();
-                      });
+        ProductService.scan(cleanedCode, method, force)
+          .then(() => {
+            scanGate.sendFinished(true);
+            refreshStats();
+            playerSuccess.seekTo(0);
+            playerSuccess.play();
+          })
+          .catch((error: AxiosErrorType) => {
+            if (__DEV__) {
+              console.error("❌ Erreur lors du scan:", error);
+              console.warn("erreur repéré : ", error);
+            }
+
+            if (error.response?.status === 409) {
+              scanGate.alertOpened();
+              Alert.alert(
+                "Attention : péremption plus proche détectée",
+                "Un autre lot de ce produit expire avant celui-ci. Voulez-vous tout de même sortir ce lot ?",
+                [
+                  {
+                    text: "Annuler",
+                    style: "cancel",
+                    onPress: () => {
+                      scanGate.alertCancelled();
+                      ToastService.info("Vous avez annulé le scan");
+                    },
                   },
-                },
-              ],
-            );
-          } else {
-            playerError.seekTo(0);
-            playerError.play();
-          }
-        })
-        .finally(() => {
-          setIsProcessing(false);
-        });
+                  {
+                    text: "Forcer la sortie",
+                    style: "destructive",
+                    onPress: () => {
+                      scanGate.alertForced();
+                      sendScan(true);
+                    },
+                  },
+                ],
+                // Android drops cancelable for an alert raised in the background, so Back can still close it.
+                { cancelable: false, onDismiss: () => scanGate.alertCancelled() },
+              );
+            } else {
+              scanGate.sendFinished(false);
+              playerError.seekTo(0);
+              playerError.play();
+            }
+          })
+          .finally(() => {
+            setIsProcessing(false);
+          });
+      };
+
+      sendScan(false);
     },
     [scanGate, method, refreshStats, playerSuccess, playerError],
   );
