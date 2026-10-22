@@ -45,3 +45,6 @@ app-example
 # generated native folders
 /ios
 /android
+
+# working notes (specs, tickets)
+/.scratch/
