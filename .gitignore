@@ -47,4 +47,5 @@ app-example
 /android
 
 # working notes (specs, tickets)
-/.scratch/
+.scratch/
+.claude
