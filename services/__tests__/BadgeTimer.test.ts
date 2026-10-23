@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BADGE_DURATION_MS, createBadgeTimer, LATE_REMOVAL_MS, type RemoveScope } from "../BadgeTimer";
+import {
+  BADGE_DURATION_MS,
+  createBadgeTimer,
+  LATE_REMOVAL_MS,
+  parseStoredDeadline,
+  type RemoveScope,
+} from "../BadgeTimer";
 
 const START = new Date("2026-10-23T08:00:00Z").getTime();
 const s = (seconds: number) => seconds * 1000;
@@ -12,16 +18,18 @@ function setup(removeSucceeds = true) {
   let clockOffset = 0;
   const remove = vi.fn((_scope: RemoveScope) => Promise.resolve(removeSucceeds));
   const confirm = vi.fn();
+  const saveDeadline = vi.fn((_deadline: number) => {});
   const timer = createBadgeTimer({
     durationMs: BADGE_DURATION_MS,
     now: () => Date.now() + clockOffset,
     remove,
     confirm,
+    saveDeadline,
   });
   const setClockOffset = (ms: number) => {
     clockOffset = ms;
   };
-  return { timer, remove, confirm, setClockOffset };
+  return { timer, remove, confirm, saveDeadline, setClockOffset };
 }
 
 describe("BadgeTimer", () => {
@@ -32,6 +40,7 @@ describe("BadgeTimer", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it("removes a connected badge one minute after it connected", async () => {
@@ -259,5 +268,98 @@ describe("BadgeTimer", () => {
 
     expect(remove).toHaveBeenCalledTimes(1);
     expect(confirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("arms a stored deadline as it is, without a fresh minute", async () => {
+    const { timer, remove, confirm } = setup();
+
+    timer.badgeConnected(START + s(40));
+    await advanceTo(s(39));
+    expect(remove).not.toHaveBeenCalled();
+
+    await advanceTo(s(40));
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(remove).toHaveBeenCalledWith("all");
+    expect(confirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("removes a badge whose stored deadline has passed, without confirming", async () => {
+    const { timer, remove, confirm } = setup();
+
+    timer.badgeConnected(START - s(1));
+
+    expect(timer.isBadgeValid()).toBe(false);
+    await advanceTo(s(120));
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(remove).toHaveBeenCalledWith("all");
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it("saves the new deadline when it arms and when a send pushes it back", async () => {
+    const { timer, saveDeadline } = setup();
+
+    timer.badgeConnected();
+    expect(saveDeadline).toHaveBeenLastCalledWith(START + s(60));
+
+    await advanceTo(s(30));
+    timer.scanSent();
+    expect(saveDeadline).toHaveBeenLastCalledWith(START + s(90));
+    expect(saveDeadline).toHaveBeenCalledTimes(2);
+  });
+
+  it("saves no deadline for a send without a connected badge", () => {
+    const { timer, saveDeadline } = setup();
+
+    timer.scanSent();
+
+    expect(saveDeadline).not.toHaveBeenCalled();
+  });
+
+  it("treats a stored deadline equal to now as passed and saves nothing", () => {
+    const { timer, remove, saveDeadline } = setup();
+
+    timer.badgeConnected(START);
+
+    expect(remove).toHaveBeenCalledWith("all");
+    expect(saveDeadline).not.toHaveBeenCalled();
+  });
+
+  it("caps a stored deadline to one minute from now", async () => {
+    const { timer, remove } = setup();
+
+    timer.badgeConnected(START + s(600));
+    await advanceTo(s(59));
+    expect(remove).not.toHaveBeenCalled();
+
+    await advanceTo(s(60));
+    expect(remove).toHaveBeenCalledWith("all");
+  });
+
+  it("still pushes back and removes the badge when saving the deadline throws", async () => {
+    const { timer, remove, confirm, saveDeadline } = setup();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    saveDeadline.mockImplementation(() => {
+      throw new Error("storage full");
+    });
+
+    timer.badgeConnected();
+    await advanceTo(s(30));
+    timer.scanSent();
+    await advanceTo(s(89));
+    expect(remove).not.toHaveBeenCalled();
+
+    await advanceTo(s(90));
+    expect(remove).toHaveBeenCalledWith("all");
+    expect(confirm).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("parseStoredDeadline", () => {
+  it.each([null, "abc", "NaN", "Infinity"])("reads %s as a deadline long past", (value) => {
+    expect(parseStoredDeadline(value)).toBe(0);
+  });
+
+  it("reads a stored time in ms", () => {
+    expect(parseStoredDeadline("1700000000000")).toBe(1700000000000);
   });
 });

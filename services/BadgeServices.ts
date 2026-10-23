@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AxiosErrorType } from "../model/ApiError";
 import apiClient from "./ApiService";
+import { BADGE_DEADLINE_KEY, BADGE_DURATION_MS } from "./BadgeTimer";
 import ToastService from "./ToastService";
 
 class BadgeService {
@@ -31,6 +32,10 @@ class BadgeService {
         await AsyncStorage.setItem(
           "badge-scan",
           JSON.stringify(response.data.scan)
+        );
+        await AsyncStorage.setItem(
+          BADGE_DEADLINE_KEY,
+          String(Date.now() + BADGE_DURATION_MS)
         );
         ToastService.success(
           `Badge ${response.data.identifier} connect\u00e9`,

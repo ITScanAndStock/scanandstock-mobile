@@ -1,4 +1,5 @@
 export const BADGE_DURATION_MS = 60_000;
+export const BADGE_DEADLINE_KEY = "badge_deadline";
 // A foreground timer fires on time, so a later removal means the phone slept and nobody is there to read a toast.
 export const LATE_REMOVAL_MS = 5000;
 
@@ -9,17 +10,23 @@ type BadgeTimerOptions = {
   now: () => number;
   remove: (scope: RemoveScope) => Promise<boolean>;
   confirm: () => void;
+  saveDeadline: (deadline: number) => void;
 };
 
 export type BadgeTimer = {
-  badgeConnected: () => void;
+  badgeConnected: (storedDeadline?: number) => void;
   isBadgeValid: () => boolean;
   scanSent: () => void;
   removeManually: () => Promise<void>;
   cancel: () => void;
 };
 
-export function createBadgeTimer({ durationMs, now, remove, confirm }: BadgeTimerOptions): BadgeTimer {
+export function parseStoredDeadline(value: string | null): number {
+  const deadline = Number(value);
+  return Number.isFinite(deadline) ? deadline : 0;
+}
+
+export function createBadgeTimer({ durationMs, now, remove, confirm, saveDeadline }: BadgeTimerOptions): BadgeTimer {
   let connected = false;
   let deadline = 0;
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -46,10 +53,17 @@ export function createBadgeTimer({ durationMs, now, remove, confirm }: BadgeTime
     }
   };
 
-  const arm = () => {
+  const arm = (remainingMs: number) => {
     clearTimer();
-    deadline = now() + durationMs;
-    timer = setTimeout(() => void removeAtDeadline(), durationMs);
+    deadline = now() + remainingMs;
+    timer = setTimeout(() => void removeAtDeadline(), remainingMs);
+    try {
+      saveDeadline(deadline);
+    } catch (error) {
+      if (__DEV__) {
+        console.error("Erreur enregistrement échéance du badge:", error);
+      }
+    }
   };
 
   const isBadgeValid = () => {
@@ -64,14 +78,20 @@ export function createBadgeTimer({ durationMs, now, remove, confirm }: BadgeTime
   };
 
   return {
-    badgeConnected: () => {
+    badgeConnected: (storedDeadline) => {
+      const remainingMs = storedDeadline === undefined ? durationMs : Math.min(durationMs, storedDeadline - now());
+      if (remainingMs <= 0) {
+        disconnect();
+        void remove("all");
+        return;
+      }
       connected = true;
-      arm();
+      arm(remainingMs);
     },
     isBadgeValid,
     scanSent: () => {
       if (isBadgeValid()) {
-        arm();
+        arm(durationMs);
       }
     },
     removeManually: async () => {

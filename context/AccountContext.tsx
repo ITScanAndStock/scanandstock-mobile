@@ -1,4 +1,10 @@
-import { BADGE_DURATION_MS, createBadgeTimer, type RemoveScope } from "@/services/BadgeTimer";
+import {
+  BADGE_DEADLINE_KEY,
+  BADGE_DURATION_MS,
+  createBadgeTimer,
+  parseStoredDeadline,
+  type RemoveScope,
+} from "@/services/BadgeTimer";
 import BadgeServices from "@/services/BadgeServices";
 import ToastService from "@/services/ToastService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -7,6 +13,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { Account } from "../model/Account";
@@ -34,7 +41,7 @@ type StoredAccounts = {
   tracingEnabled?: boolean;
 };
 
-type StoredBadge = { id: string; name: string; scan: string };
+type StoredBadge = { id: string; name: string; scan: string; deadline: number };
 
 async function readAccounts(): Promise<StoredAccounts> {
   const accountsString = await AsyncStorage.getItem("account");
@@ -51,6 +58,7 @@ async function readBadge(): Promise<StoredBadge | null> {
   const badgeId = await AsyncStorage.getItem("badge_id");
   const userName = await AsyncStorage.getItem("user_name");
   const badgeScan = await AsyncStorage.getItem("badge-scan");
+  const deadline = await AsyncStorage.getItem(BADGE_DEADLINE_KEY);
   if (!badgeId || !userName || !badgeScan) {
     return null;
   }
@@ -58,6 +66,7 @@ async function readBadge(): Promise<StoredBadge | null> {
     id: String(JSON.parse(badgeId)),
     name: String(JSON.parse(userName)),
     scan: String(JSON.parse(badgeScan)),
+    deadline: parseStoredDeadline(deadline),
   };
 }
 
@@ -68,11 +77,12 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   const [activeAccount, setActiveAccountState] = useState<Account | null>(null);
   const [isTracingEnabled, setIsTracingEnabled] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState(true);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const isAuthenticatedRef = useRef(isAuthenticated);
   const [activeBadgeId, setActiveBadgeId] = useState<string | null>(null);
   const [activeBadgeName, setActiveBadgeName] = useState("");
 
-  const removeBadge = async (scope: RemoveScope) => {
+  const removeBadge = useCallback(async (scope: RemoveScope) => {
     HeaderStore.setBadgeScan(undefined);
     setActiveBadgeId(null);
     setActiveBadgeName("");
@@ -80,7 +90,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       return true;
     }
     try {
-      await AsyncStorage.multiRemove(["badge_id", "user_name", "badge-scan"]);
+      await AsyncStorage.multiRemove(["badge_id", "user_name", "badge-scan", BADGE_DEADLINE_KEY]);
       return true;
     } catch (error) {
       if (__DEV__) {
@@ -88,7 +98,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       }
       return false;
     }
-  };
+  }, []);
 
   const [badgeTimer] = useState(() =>
     createBadgeTimer({
@@ -96,6 +106,13 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       now: Date.now,
       remove: removeBadge,
       confirm: () => ToastService.info("Badge déconnecté avec succès"),
+      saveDeadline: (deadline) => {
+        AsyncStorage.setItem(BADGE_DEADLINE_KEY, String(deadline)).catch((error) => {
+          if (__DEV__) {
+            console.error("Erreur enregistrement échéance du badge:", error);
+          }
+        });
+      },
     }),
   );
 
@@ -114,23 +131,43 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const applyBadge = useCallback(
-    (stored: StoredBadge | null) => {
-      if (stored) {
+    async (stored: StoredBadge | null) => {
+      if (!stored) {
+        HeaderStore.setBadgeScan(undefined);
+        return;
+      }
+      if (!isAuthenticatedRef.current) {
+        await removeBadge("all");
+        return;
+      }
+      badgeTimer.badgeConnected(stored.deadline);
+      if (badgeTimer.isBadgeValid()) {
         setActiveBadgeId(stored.id);
         setActiveBadgeName(stored.name);
         HeaderStore.setBadgeScan(stored.scan);
-        badgeTimer.badgeConnected();
-      } else {
-        HeaderStore.setBadgeScan(undefined);
       }
     },
-    [badgeTimer],
+    [badgeTimer, removeBadge],
   );
+
+  // Declared before the load effect, so the load and an in-flight getBadge see the session of this render.
+  useEffect(() => {
+    isAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (!isAuthenticated) {
       badgeTimer.cancel();
     }
+    const badgeLoad = isAuthLoading
+      ? Promise.resolve()
+      : readBadge()
+          .then(applyBadge)
+          .catch((error) => {
+            if (__DEV__) {
+              console.error("Erreur chargement badge:", error);
+            }
+          });
     Promise.all([
       readAccounts()
         .then(applyAccounts)
@@ -139,15 +176,9 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
             console.error("Erreur chargement comptes:", error);
           }
         }),
-      readBadge()
-        .then(applyBadge)
-        .catch((error) => {
-          if (__DEV__) {
-            console.error("Erreur chargement badge:", error);
-          }
-        }),
+      badgeLoad,
     ]).finally(() => setIsLoading(false));
-  }, [isAuthenticated, badgeTimer, applyAccounts, applyBadge]);
+  }, [isAuthenticated, isAuthLoading, badgeTimer, applyAccounts, applyBadge]);
 
   useEffect(() => () => badgeTimer.cancel(), [badgeTimer]);
 
@@ -156,7 +187,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       const succes = await BadgeServices.getBadge(badge);
       if (succes) {
-        applyBadge(await readBadge());
+        await applyBadge(await readBadge());
       }
     } catch (error) {
       if (__DEV__) {

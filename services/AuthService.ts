@@ -4,6 +4,7 @@ import * as AuthSession from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import { apiConfig, keycloakConfig } from "../config/KeycloakConfig";
 import { TokenResponse, UserInfo } from "../model/ApiError";
+import { BADGE_DEADLINE_KEY } from "./BadgeTimer";
 import SecureStorageService from "./SecureStorageService";
 
 // Nécessaire pour que le navigateur se ferme après l'authentification
@@ -377,6 +378,7 @@ class AuthService {
         "badge_id",
         "user_name",
         "badge-scan",
+        BADGE_DEADLINE_KEY,
         "id_token",
       ]);
     } catch (error) {
@@ -397,7 +399,7 @@ class AuthService {
 
       const roles: string[] = JSON.parse(rolesString);
       return roles.includes(role);
-    } catch (error) {
+    } catch {
       return false;
     }
   }
