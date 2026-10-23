@@ -517,4 +517,58 @@ describe("ScanGate", () => {
     forced.sendFinished(true);
     expect(forced.isBusy()).toBe(false);
   });
+
+  it("holds the connected badge's code still in view 5 s after the connection (catches: badgeConnected holds nothing)", () => {
+    const gate = createScanGate();
+    gate.badgeConnected("BADGE-42", 0);
+
+    expect(scan(gate, "BADGE-42", 100, 5100)).toEqual([]);
+  });
+
+  it("sends the badge's code again after an absence of REARM_DELAY_MS (catches: the badge's code held for good)", () => {
+    const gate = createScanGate();
+    gate.badgeConnected("BADGE-42", 0);
+    expect(scan(gate, "BADGE-42", 100, 500)).toEqual([]);
+
+    const back = 500 + REARM_DELAY_MS;
+    expect(scan(gate, "BADGE-42", back, back + 200)).toEqual([back + 200]);
+  });
+
+  it("keeps holding the badge's code across a camera closed 800 ms after the connection and reopened (catches: closing the camera drops the badge's hold)", () => {
+    const gate = createScanGate();
+    gate.badgeConnected("BADGE-42", 0);
+    expect(scan(gate, "BADGE-42", 100, 700)).toEqual([]);
+
+    const reopenedAt = 800 + 3000;
+    gate.cameraClosed(800);
+    gate.cameraReopened();
+
+    expect(scan(gate, "BADGE-42", reopenedAt + 300, reopenedAt + 2300)).toEqual([]);
+  });
+
+  it("sends another code on its 3rd frame while the badge's code is held (catches: the badge's hold blocks every code)", () => {
+    const gate = createScanGate();
+    gate.badgeConnected("BADGE-42", 0);
+    expect(scan(gate, "BADGE-42", 100, 300)).toEqual([]);
+
+    expect(scan(gate, "AAAA", 400, 600)).toEqual([600]);
+  });
+
+  it("holds a raw badge code with \\x1D as the camera reads it (catches: the badge's code kept uncleaned)", () => {
+    const gate = createScanGate();
+    gate.badgeConnected("BADGE\x1D42", 0);
+
+    expect(scan(gate, "BADGE\x1D42", 100, 1100)).toEqual([]);
+  });
+
+  it("re-sends a product absent REARM_DELAY_MS while the badge stays in view (catches: a product sent next to the badge joins the badge's group)", () => {
+    const gate = createScanGate();
+    gate.badgeConnected("BADGE-42", 0);
+    expect(scan(gate, "BADGE-42", 100, 300)).toEqual([]);
+    expect(scan(gate, "AAAA", 400, 600)).toEqual([600]);
+    gate.sendFinished(true);
+    expect(scan(gate, "BADGE-42", 700, 3100)).toEqual([]);
+
+    expect(scan(gate, "AAAA", 3200, 3400)).toEqual([3400]);
+  });
 });

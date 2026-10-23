@@ -43,6 +43,7 @@ class BadgeService {
         );
         return true;
       }
+      ToastService.error("Badge non reconnu", "Erreur");
       return false;
     } catch (error) {
       const axiosError = error as AxiosErrorType;

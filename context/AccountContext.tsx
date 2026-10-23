@@ -29,7 +29,7 @@ interface AccountContextType {
   resetAccount: () => Promise<void>;
   activeBadgeId: string | null;
   activeBadgeName: string;
-  getBadge: (badge: string) => Promise<void>;
+  getBadge: (badge: string) => Promise<boolean>;
   resetBadge: () => Promise<void>;
   isBadgeValid: () => boolean;
   scanSent: () => void;
@@ -185,14 +185,16 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   const getBadge = async (badge: string) => {
     try {
       setIsLoading(true);
-      const succes = await BadgeServices.getBadge(badge);
-      if (succes) {
+      const accepted = await BadgeServices.getBadge(badge);
+      if (accepted) {
         await applyBadge(await readBadge());
       }
+      return accepted;
     } catch (error) {
       if (__DEV__) {
         console.error("Erreur connexion badge:", error);
       }
+      return false;
     } finally {
       setIsLoading(false);
     }
