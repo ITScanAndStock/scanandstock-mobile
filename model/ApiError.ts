@@ -12,6 +12,7 @@ export interface AxiosErrorType {
 	};
 	config?: {
 		url?: string;
+		headers?: Record<string, unknown>;
 	};
 	code?: string;
 	message: string;

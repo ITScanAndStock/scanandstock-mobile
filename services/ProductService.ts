@@ -1,6 +1,7 @@
 import { AxiosErrorType } from "../model/ApiError";
 import { StatsResponse } from "../model/Stats";
 import { Method, StockModel } from "../model/Stock";
+import HeaderStore from "../state/HeaderStore";
 import apiClient from "./ApiService";
 import ToastService from "./ToastService";
 
@@ -56,6 +57,26 @@ class ProductService {
           "Le scan a peut-être été enregistré : vérifiez le stock avant de scanner à nouveau.",
           "Pas de réponse du serveur",
         );
+      } else if (axiosError.response.status === 417) {
+        if (axiosError.config?.headers?.["Badge-Id"]) {
+          ToastService.error(
+            "Touchez la pastille de votre badge pour le retirer, puis scannez un badge actif.",
+            "Badge refusé",
+            6000,
+          );
+        } else if (HeaderStore.isTracingEnabled()) {
+          ToastService.error(
+            "Scannez votre badge puis recommencez.",
+            "Badge requis",
+            6000,
+          );
+        } else {
+          ToastService.error(
+            "Le traçage par badge est activé sur votre compte : déconnectez-vous puis reconnectez-vous.",
+            "Badge requis",
+            6000,
+          );
+        }
       } else if (axiosError.response.status !== 409) {
         ToastService.error("Erreur lors du scan du produit");
       }
