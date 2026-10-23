@@ -89,8 +89,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBadgeProcessing, setIsBadgeProcessing] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
-  const { isTracingEnabled, activeBadgeId, activeAccount, getBadge, resetAfterTimeout } =
-    useAccount();
+  const { isTracingEnabled, activeAccount, getBadge, isBadgeValid, scanSent } = useAccount();
 
   const bannerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const badgeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -150,7 +149,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
   };
 
   const handleBadgeConnexion = async ({ data }: BarcodeScanningResult) => {
-    if (badgeProcessingRef.current || activeBadgeId !== null) return;
+    if (badgeProcessingRef.current || isBadgeValid()) return;
 
     badgeProcessingRef.current = true;
     setIsBadgeProcessing(true);
@@ -192,6 +191,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
 
         Vibration.vibrate(100);
 
+        scanSent();
         ProductService.scan(cleanedCode, method, force)
           .then(() => {
             scanGate.sendFinished(true);
@@ -244,7 +244,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
 
       sendScan(false);
     },
-    [scanGate, method, refreshStats, playerSuccess, playerError],
+    [scanGate, method, refreshStats, playerSuccess, playerError, scanSent],
   );
 
   const barcodeScannerSettings = useMemo(
@@ -256,15 +256,12 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
 
   const handleScan = ({ data }: BarcodeScanningResult) => {
     if (!activeRef.current || badgeProcessingRef.current) return;
-    if (isTracingEnabled && activeBadgeId === null) {
+    if (isTracingEnabled && !isBadgeValid()) {
       if (!scanGate.isBusy()) {
         handleBadgeConnexion({ data } as BarcodeScanningResult);
       }
     } else {
       handleBarcodeScanned({ data } as BarcodeScanningResult);
-      if (activeBadgeId !== "") {
-        resetAfterTimeout();
-      }
     }
   };
 
