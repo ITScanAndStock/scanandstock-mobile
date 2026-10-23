@@ -1,9 +1,15 @@
 // Never below 800 ms: expo-camera drops a repeated event for 500 ms (EventThrottleMs), so a still code shows such gaps.
 export const REARM_DELAY_MS = 1000;
+// Longer than the gaps a hand-held phone leaves with the code in view, so a cancel stays a cancel.
+export const CANCELLED_REARM_DELAY_MS = 3000;
+// Longer than the time Android leaves one code of a two-code box unreported, so a box still counts as one.
+export const GROUP_HOLD_MAX_MS = 6000;
 
 const FRAMES_TO_SEND = 3;
 const MIN_CODE_LENGTH = 4;
 const MAX_CODE_LENGTH = 100;
+
+type Hold = { groupLastSeen: number; ownLastSeen: number; delay: number; group: number };
 
 export type ScanDecision = { kind: "send"; code: string } | { kind: "ignore"; reason?: "invalid" };
 
@@ -11,9 +17,10 @@ export type ScanGate = {
   frame: (raw: string, now: number) => ScanDecision;
   sendFinished: (ok: boolean) => void;
   alertOpened: () => void;
-  alertCancelled: () => void;
-  alertForced: () => void;
-  cameraReopened: (now: number) => void;
+  alertCancelled: (now: number) => void;
+  alertForced: (now: number) => void;
+  cameraClosed: (now: number) => void;
+  cameraReopened: () => void;
   isBusy: () => boolean;
 };
 
@@ -22,8 +29,46 @@ export function createScanGate(): ScanGate {
   let count = 0;
   let busy = false;
   let alertOpen = false;
-  let held: string | null = null;
-  let heldLastSeen = 0;
+  // Android reports one code per frame, so a frame of any code of a box extends the whole group's hold.
+  const held = new Map<string, Hold>();
+  let lastSent: string | null = null;
+  let nextGroupId = 0;
+  let awaitingFirstFrame = false;
+  let closedAt: number | null = null;
+  let closed = false;
+
+  const groupForNewHold = () => {
+    let freshest: Hold | null = null;
+    for (const hold of held.values()) {
+      if (!freshest || hold.groupLastSeen > freshest.groupLastSeen) {
+        freshest = hold;
+      }
+    }
+    return freshest?.group ?? ++nextGroupId;
+  };
+
+  const holdAlertGroupFrom = (now: number, delay: number) => {
+    if (lastSent !== null) {
+      const group = held.get(lastSent)?.group ?? groupForNewHold();
+      for (const member of held.values()) {
+        if (member.group === group) {
+          member.groupLastSeen = now;
+          member.ownLastSeen = now;
+        }
+      }
+      held.set(lastSent, { groupLastSeen: now, ownLastSeen: now, delay, group });
+    }
+  };
+
+  const forgetExpiredHolds = (now: number) => {
+    const alertGroup = alertOpen && lastSent !== null ? held.get(lastSent)?.group : undefined;
+    for (const [heldCode, { groupLastSeen, ownLastSeen, delay, group }] of held) {
+      const expired = now - groupLastSeen >= delay || now - ownLastSeen >= GROUP_HOLD_MAX_MS;
+      if (group !== alertGroup && expired) {
+        held.delete(heldCode);
+      }
+    }
+  };
 
   const resetCount = () => {
     candidate = null;
@@ -37,15 +82,25 @@ export function createScanGate(): ScanGate {
         return { kind: "ignore", reason: "invalid" };
       }
 
-      if (code === held) {
-        const absentLongEnough = now - heldLastSeen >= REARM_DELAY_MS;
-        heldLastSeen = now;
-        if (absentLongEnough) {
-          held = null;
-        } else {
-          resetCount();
-          return { kind: "ignore" };
+      if (awaitingFirstFrame) {
+        awaitingFirstFrame = false;
+        // The first frame comes well after open() and onCameraReady, so closed-camera time lasts until it.
+        for (const hold of held.values()) {
+          hold.groupLastSeen = Math.max(hold.groupLastSeen, now);
+          hold.ownLastSeen = Math.max(hold.ownLastSeen, now);
         }
+      }
+      forgetExpiredHolds(now);
+      const hold = held.get(code);
+      if (hold) {
+        for (const member of held.values()) {
+          if (member.group === hold.group) {
+            member.groupLastSeen = now;
+          }
+        }
+        hold.ownLastSeen = now;
+        resetCount();
+        return { kind: "ignore" };
       }
 
       if (busy || alertOpen) {
@@ -64,8 +119,8 @@ export function createScanGate(): ScanGate {
       }
       resetCount();
       busy = true;
-      held = code;
-      heldLastSeen = now;
+      held.set(code, { groupLastSeen: now, ownLastSeen: now, delay: REARM_DELAY_MS, group: groupForNewHold() });
+      lastSent = code;
       return { kind: "send", code };
     },
     sendFinished: () => {
@@ -75,16 +130,32 @@ export function createScanGate(): ScanGate {
       busy = false;
       alertOpen = true;
     },
-    alertCancelled: () => {
+    alertCancelled: (now) => {
+      if (alertOpen) {
+        holdAlertGroupFrom(now, CANCELLED_REARM_DELAY_MS);
+      }
       alertOpen = false;
     },
-    alertForced: () => {
+    alertForced: (now) => {
+      if (alertOpen) {
+        holdAlertGroupFrom(now, REARM_DELAY_MS);
+      }
       alertOpen = false;
       busy = true;
     },
-    cameraReopened: (now) => {
+    cameraClosed: (now) => {
+      if (!closed && !awaitingFirstFrame) {
+        closedAt = now;
+      }
+      closed = true;
+    },
+    cameraReopened: () => {
+      closed = false;
       resetCount();
-      heldLastSeen = Math.max(heldLastSeen, now);
+      if (closedAt !== null) {
+        forgetExpiredHolds(closedAt);
+      }
+      awaitingFirstFrame = true;
     },
     isBusy: () => busy || alertOpen,
   };

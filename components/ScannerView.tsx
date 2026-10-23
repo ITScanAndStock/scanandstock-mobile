@@ -122,12 +122,13 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
     () => ({
       open: () => {
         activeRef.current = true;
-        scanGate.cameraReopened(Date.now());
+        scanGate.cameraReopened();
         handleMethodChange(INITIAL_METHOD);
         cameraRef.current?.resumePreview();
       },
       close: () => {
         activeRef.current = false;
+        scanGate.cameraClosed(Date.now());
         for (const timer of [bannerTimeoutRef, badgeTimeoutRef]) {
           if (timer.current) {
             clearTimeout(timer.current);
@@ -214,7 +215,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
                     text: "Annuler",
                     style: "cancel",
                     onPress: () => {
-                      scanGate.alertCancelled();
+                      scanGate.alertCancelled(Date.now());
                       ToastService.info("Vous avez annulé le scan");
                     },
                   },
@@ -222,13 +223,13 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
                     text: "Forcer la sortie",
                     style: "destructive",
                     onPress: () => {
-                      scanGate.alertForced();
+                      scanGate.alertForced(Date.now());
                       sendScan(true);
                     },
                   },
                 ],
                 // Android drops cancelable for an alert raised in the background, so Back can still close it.
-                { cancelable: false, onDismiss: () => scanGate.alertCancelled() },
+                { cancelable: false, onDismiss: () => scanGate.alertCancelled(Date.now()) },
               );
             } else {
               scanGate.sendFinished(false);
