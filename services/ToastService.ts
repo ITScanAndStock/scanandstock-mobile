@@ -21,13 +21,13 @@ class ToastService {
 	/**
 	 * Afficher un toast d'erreur
 	 */
-	error(message: string, title: string = 'Erreur') {
+	error(message: string, title: string = 'Erreur', durationMs: number = 4000) {
 		Toast.show({
 			type: 'error',
 			text1: title,
 			text2: message,
 			position: 'top',
-			visibilityTime: 4000,
+			visibilityTime: durationMs,
 		});
 	}
 

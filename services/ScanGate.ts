@@ -9,6 +9,8 @@ const FRAMES_TO_SEND = 3;
 const MIN_CODE_LENGTH = 4;
 const MAX_CODE_LENGTH = 100;
 
+const normalize = (raw: string) => raw.replace(/\x1D/g, "$");
+
 type Hold = { groupLastSeen: number; ownLastSeen: number; delay: number; group: number };
 
 export type ScanDecision = { kind: "send"; code: string } | { kind: "ignore"; reason?: "invalid" };
@@ -21,6 +23,7 @@ export type ScanGate = {
   alertForced: (now: number) => void;
   cameraClosed: (now: number) => void;
   cameraReopened: () => void;
+  badgeConnected: (raw: string, now: number) => void;
   isBusy: () => boolean;
 };
 
@@ -33,6 +36,7 @@ export function createScanGate(): ScanGate {
   const held = new Map<string, Hold>();
   let lastSent: string | null = null;
   let nextGroupId = 0;
+  let badgeGroup: number | null = null;
   let awaitingFirstFrame = false;
   let closedAt: number | null = null;
   let closed = false;
@@ -40,6 +44,9 @@ export function createScanGate(): ScanGate {
   const groupForNewHold = () => {
     let freshest: Hold | null = null;
     for (const hold of held.values()) {
+      if (hold.group === badgeGroup) {
+        continue;
+      }
       if (!freshest || hold.groupLastSeen > freshest.groupLastSeen) {
         freshest = hold;
       }
@@ -77,7 +84,7 @@ export function createScanGate(): ScanGate {
 
   return {
     frame: (raw, now) => {
-      const code = raw.replace(/\x1D/g, "$");
+      const code = normalize(raw);
       if (code.length < MIN_CODE_LENGTH || code.length > MAX_CODE_LENGTH) {
         return { kind: "ignore", reason: "invalid" };
       }
@@ -156,6 +163,11 @@ export function createScanGate(): ScanGate {
         forgetExpiredHolds(closedAt);
       }
       awaitingFirstFrame = true;
+    },
+    badgeConnected: (raw, now) => {
+      // A badge is never part of a box: its own group, which no product joins, so it never holds one.
+      badgeGroup = ++nextGroupId;
+      held.set(normalize(raw), { groupLastSeen: now, ownLastSeen: now, delay: REARM_DELAY_MS, group: badgeGroup });
     },
     isBusy: () => busy || alertOpen,
   };

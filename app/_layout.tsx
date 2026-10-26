@@ -3,7 +3,10 @@ import React, { useEffect } from "react";
 import { View } from "react-native";
 import "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Toast from "react-native-toast-message";
+import Toast, {
+  ErrorToast,
+  type ToastConfig,
+} from "react-native-toast-message";
 
 // import expo
 import { useFonts } from "expo-font";
@@ -17,6 +20,21 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { StatsProvider } from "@/context/StatsContext";
 import CustomSplashScreen from "../components/CustomSplashScreen";
 import RootNavigator from "./RootNavigator";
+
+const toastConfig: ToastConfig = {
+  error: (props) => (
+    <ErrorToast
+      {...props}
+      text2NumberOfLines={3}
+      style={{
+        borderLeftColor: "#FE6301",
+        height: undefined,
+        minHeight: 60,
+        paddingVertical: 8,
+      }}
+    />
+  ),
+};
 
 function RootLayoutContent() {
   const { isLoading } = useAuth();
@@ -52,7 +70,7 @@ function RootLayoutContent() {
       </View>
       <View style={{ flex: 1 }}>
         <RootNavigator />
-        <Toast />
+        <Toast config={toastConfig} />
       </View>
     </>
   );

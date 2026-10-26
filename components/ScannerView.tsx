@@ -89,12 +89,13 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBadgeProcessing, setIsBadgeProcessing] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
-  const { isTracingEnabled, activeBadgeId, activeAccount, getBadge, resetAfterTimeout } =
-    useAccount();
+  const { isTracingEnabled, activeAccount, getBadge, isBadgeValid, scanSent } = useAccount();
 
   const bannerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const badgeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const badgeProcessingRef = useRef(false);
+  const badgeRequestInFlightRef = useRef(false);
+  const openCountRef = useRef(0);
 
   const lastScan = stats && stats.length > 0 ? stats[0] : null;
   const lastScanIncrease =
@@ -122,6 +123,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
     () => ({
       open: () => {
         activeRef.current = true;
+        openCountRef.current += 1;
         scanGate.cameraReopened();
         handleMethodChange(INITIAL_METHOD);
         cameraRef.current?.resumePreview();
@@ -150,28 +152,33 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
   };
 
   const handleBadgeConnexion = async ({ data }: BarcodeScanningResult) => {
-    if (badgeProcessingRef.current || activeBadgeId !== null) return;
+    if (badgeProcessingRef.current || badgeRequestInFlightRef.current || isBadgeValid()) return;
 
     badgeProcessingRef.current = true;
     setIsBadgeProcessing(true);
     Vibration.vibrate(100);
+    const openCount = openCountRef.current;
+    badgeRequestInFlightRef.current = true;
+    let connected: boolean;
     try {
-      await getBadge(data);
-      playerSuccess.seekTo(0);
-      playerSuccess.play();
-    } catch (error) {
-      if (__DEV__) {
-        console.error("❌ Erreur lors du scan du badge:", error);
-      }
-      playerError.seekTo(0);
-      playerError.play();
+      connected = await getBadge(data);
     } finally {
-      badgeTimeoutRef.current = setTimeout(() => {
-        onClose();
-        badgeProcessingRef.current = false;
-        setIsBadgeProcessing(false);
-      }, 800);
+      badgeRequestInFlightRef.current = false;
     }
+    if (connected) {
+      scanGate.badgeConnected(data, Date.now());
+    }
+    const player = connected ? playerSuccess : playerError;
+    player.seekTo(0);
+    player.play();
+
+    // close() already released the lock; after a reopen it belongs to the new connection.
+    if (!activeRef.current || openCountRef.current !== openCount) return;
+    badgeTimeoutRef.current = setTimeout(() => {
+      onClose();
+      badgeProcessingRef.current = false;
+      setIsBadgeProcessing(false);
+    }, 800);
   };
 
   const handleBarcodeScanned = useCallback(
@@ -192,6 +199,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
 
         Vibration.vibrate(100);
 
+        scanSent();
         ProductService.scan(cleanedCode, method, force)
           .then(() => {
             scanGate.sendFinished(true);
@@ -244,7 +252,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
 
       sendScan(false);
     },
-    [scanGate, method, refreshStats, playerSuccess, playerError],
+    [scanGate, method, refreshStats, playerSuccess, playerError, scanSent],
   );
 
   const barcodeScannerSettings = useMemo(
@@ -256,15 +264,12 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
 
   const handleScan = ({ data }: BarcodeScanningResult) => {
     if (!activeRef.current || badgeProcessingRef.current) return;
-    if (isTracingEnabled && activeBadgeId === null) {
+    if (isTracingEnabled && !isBadgeValid()) {
       if (!scanGate.isBusy()) {
         handleBadgeConnexion({ data } as BarcodeScanningResult);
       }
     } else {
       handleBarcodeScanned({ data } as BarcodeScanningResult);
-      if (activeBadgeId !== "") {
-        resetAfterTimeout();
-      }
     }
   };
 

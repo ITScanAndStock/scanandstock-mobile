@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Method } from "../../model/Stock";
+import HeaderStore from "../../state/HeaderStore";
 import apiClient from "../ApiService";
 import ProductService from "../ProductService";
 import ToastService from "../ToastService";
@@ -31,6 +32,7 @@ const mockedToast = ToastService as unknown as {
 describe("ProductService", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    HeaderStore.reset();
   });
 
   it("returns every stat sent by the API, in order", async () => {
@@ -110,5 +112,67 @@ describe("ProductService", () => {
     ).rejects.toBe(conflict);
 
     expect(mockedToast.error).not.toHaveBeenCalled();
+  });
+
+  it("tells the user to remove a refused badge when one was sent", async () => {
+    const refusal = {
+      response: { status: 417, data: {} },
+      config: { headers: { "Badge-Id": "BADGE-OLD" } },
+      message: "Missing badge for action",
+    };
+    mockedApi.put.mockRejectedValueOnce(refusal);
+
+    await expect(
+      ProductService.scan("CODE417", Method.decrease),
+    ).rejects.toBe(refusal);
+
+    expect(mockedToast.error).toHaveBeenCalledTimes(1);
+    expect(mockedToast.error).toHaveBeenCalledWith(
+      "Touchez la pastille de votre badge pour le retirer, puis scannez un badge actif.",
+      "Badge refusé",
+      6000,
+    );
+  });
+
+  it("asks for a badge scan when none was sent and tracing is on", async () => {
+    HeaderStore.setTracingEnabled(true);
+    HeaderStore.setBadgeScan("BADGE-SCANNED-AFTER");
+    const refusal = {
+      response: { status: 417, data: {} },
+      config: { headers: {} },
+      message: "Missing badge for action",
+    };
+    mockedApi.put.mockRejectedValueOnce(refusal);
+
+    await expect(
+      ProductService.scan("CODE417", Method.decrease),
+    ).rejects.toBe(refusal);
+
+    expect(mockedToast.error).toHaveBeenCalledTimes(1);
+    expect(mockedToast.error).toHaveBeenCalledWith(
+      "Scannez votre badge puis recommencez.",
+      "Badge requis",
+      6000,
+    );
+  });
+
+  it("asks to sign in again when the account traces badges but the app does not", async () => {
+    const refusal = {
+      response: { status: 417, data: {} },
+      config: { headers: {} },
+      message: "Missing badge for action",
+    };
+    mockedApi.put.mockRejectedValueOnce(refusal);
+
+    await expect(
+      ProductService.scan("CODE417", Method.decrease),
+    ).rejects.toBe(refusal);
+
+    expect(mockedToast.error).toHaveBeenCalledTimes(1);
+    expect(mockedToast.error).toHaveBeenCalledWith(
+      "Le traçage par badge est activé sur votre compte : déconnectez-vous puis reconnectez-vous.",
+      "Badge requis",
+      6000,
+    );
   });
 });
