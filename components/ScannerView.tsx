@@ -36,6 +36,7 @@ import ScanLoader from "./ScanLoader";
 import { useStats } from "../hooks/useStats";
 import { Method } from "../model/Stock";
 import ProductService from "../services/ProductService";
+import { movementDirection } from "../services/MovementDirection";
 import { createScanGate } from "../services/ScanGate";
 
 const audioSourceSucces = require("../assets/sounds/ok.mp3");
@@ -98,9 +99,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
   const openCountRef = useRef(0);
 
   const lastScan = stats && stats.length > 0 ? stats[0] : null;
-  const lastScanIncrease =
-    lastScan?.type === "increase" || lastScan?.type === "in" || (lastScan?.quantity ?? 0) > 0;
-  const lastScanQty = Math.abs(lastScan?.quantity ?? 1);
+  const lastScanDirection = lastScan ? movementDirection(lastScan) : null;
 
   const handleMethodChange = useCallback((newMethod: Method) => {
     setMethod(newMethod);
@@ -356,11 +355,11 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
         </View>
 
         <View style={styles.bottomBlock}>
-          {lastScan ? (
+          {lastScan && lastScanDirection ? (
             <View
               style={styles.lastScanCard}
               accessible={true}
-              accessibilityLabel={`Dernier scan: ${lastScan.designation}, ${lastScanIncrease ? "+" : "−"}${lastScanQty}`}
+              accessibilityLabel={`Dernier scan: ${lastScan.designation}, ${lastScanDirection.label}`}
             >
               <View style={styles.lastScanText}>
                 <Text style={styles.lastScanLabel}>Dernier scan</Text>
@@ -371,16 +370,16 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
               <View
                 style={[
                   styles.lastScanBadge,
-                  lastScanIncrease ? styles.lastScanBadgeIn : styles.lastScanBadgeOut,
+                  lastScanDirection.increase ? styles.lastScanBadgeIn : styles.lastScanBadgeOut,
                 ]}
               >
                 <Text
                   style={[
                     styles.lastScanBadgeText,
-                    lastScanIncrease ? styles.lastScanBadgeTextIn : styles.lastScanBadgeTextOut,
+                    lastScanDirection.increase ? styles.lastScanBadgeTextIn : styles.lastScanBadgeTextOut,
                   ]}
                 >
-                  {lastScanIncrease ? `+${lastScanQty}` : `−${lastScanQty}`}
+                  {lastScanDirection.label}
                 </Text>
               </View>
             </View>
