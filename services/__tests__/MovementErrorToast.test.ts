@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { movementErrorToast } from "../MovementErrorToast";
+import { isBatchChoiceRequired, movementErrorToast } from "../MovementErrorToast";
 
 const refused = (status: number, data: unknown) => ({
   response: { status, data },
@@ -73,5 +73,21 @@ describe("movementErrorToast", () => {
       "Badge requis",
       6000,
     ]);
+  });
+});
+
+describe("isBatchChoiceRequired", () => {
+  it("recognises a 400 whose body carries code 222 (catches: code compared to another value)", () => {
+    expect(isBatchChoiceRequired({ status: 400, data: { errorMessage: "RUPTURE STOCK : Fraise", code: 222 } })).toBe(true);
+  });
+
+  it("rejects a 400 with code 0 or without a body (catches: predicate on the 400 status alone)", () => {
+    expect(isBatchChoiceRequired({ status: 400, data: { errorMessage: "Refus", code: 0 } })).toBe(false);
+    expect(isBatchChoiceRequired({ status: 400, data: "" })).toBe(false);
+  });
+
+  it("rejects code 222 on another status, and no response (catches: predicate on the code alone)", () => {
+    expect(isBatchChoiceRequired({ status: 409, data: { code: 222 } })).toBe(false);
+    expect(isBatchChoiceRequired(undefined)).toBe(false);
   });
 });
