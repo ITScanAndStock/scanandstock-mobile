@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Agent skills
+
+### Issue tracker
+
+Notion: the `Spec · …` pages and the "Issues" database of the project "Amélioration de l'application mobile"; `.scratch/` is a backup no longer kept up to date. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), each a Notion `Statut` (with `Qui` telling agent from human), plus the work states. See `docs/agents/triage-labels.md`.
+
 ## Commands
 
 ```bash
