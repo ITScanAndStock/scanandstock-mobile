@@ -44,6 +44,10 @@ describe("movementErrorToast", () => {
     expect(movementErrorToast(refused(409, {}))).toBeNull();
   });
 
+  it("leaves a batch choice (code 222) to the caller (catches: the RUPTURE STOCK message shown over the batch sheet)", () => {
+    expect(movementErrorToast(refused(400, { errorMessage: "RUPTURE STOCK : <br/>Fraise 856", code: 222 }))).toBeNull();
+  });
+
   it("warns that the scan may have been saved when no answer comes back (catches: title dropped)", () => {
     expect(movementErrorToast({ badgeSent: false, tracingEnabled: false })).toEqual([
       "Le scan a peut-être été enregistré : vérifiez le stock avant de scanner à nouveau.",

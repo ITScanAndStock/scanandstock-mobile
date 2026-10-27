@@ -114,6 +114,18 @@ describe("ProductService", () => {
     expect(mockedToast.error).not.toHaveBeenCalled();
   });
 
+  it("leaves a batch choice to the caller without a toast (catches: toast shown on a 222)", async () => {
+    const batchChoice = {
+      response: { status: 400, data: { errorMessage: "RUPTURE STOCK : <br/>Fraise 856", code: 222 } },
+      message: "batch choice",
+    };
+    mockedApi.put.mockRejectedValueOnce(batchChoice);
+
+    await expect(ProductService.scan("CODE222", Method.decrease)).rejects.toBe(batchChoice);
+
+    expect(mockedToast.error).not.toHaveBeenCalled();
+  });
+
   it("tells the user to remove a refused badge when one was sent", async () => {
     const refusal = {
       response: { status: 417, data: {} },

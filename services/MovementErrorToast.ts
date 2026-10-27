@@ -4,9 +4,9 @@ type MovementError = {
   tracingEnabled: boolean;
 };
 
-type ErrorToastArgs = [message: string, title?: string, durationMs?: number];
+export type ErrorToastArgs = [message: string, title?: string, durationMs?: number];
 
-const GENERIC_MESSAGE = "Erreur lors du scan du produit";
+export const GENERIC_MESSAGE = "Erreur lors du scan du produit";
 const KIT_OUT_OF_STOCK_HEADER = "RUPTURE STOCK :";
 const BADGE_TOAST_MS = 6000;
 const BATCH_CHOICE_CODE = 222;
@@ -60,7 +60,7 @@ export function movementErrorToast({ response, badgeSent, tracingEnabled }: Move
       "Pas de réponse du serveur",
     ];
   }
-  if (response.status === 409) {
+  if (response.status === 409 || isBatchChoiceRequired(response)) {
     return null;
   }
   if (response.status === 417) {
