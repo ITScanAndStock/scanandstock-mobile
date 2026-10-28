@@ -18,6 +18,7 @@ import ChoosAccount from "../../components/ChooseAccount";
 import Header from "../../components/Header";
 import ScanBadge from "../../components/ScanBadge";
 import ScannerView, { ScannerViewHandle } from "../../components/ScannerView";
+import { useScreenLeftInset } from "../../components/SideRail";
 import { useScreenBottomInset } from "../../components/TabBar";
 import MovementRow, { MOVEMENT_ROW_HEIGHT } from "../../components/ui-components/MovementRow";
 import { colors } from "@/constants/colors";
@@ -38,6 +39,7 @@ export default function Scan() {
   const scannerRef = useRef<ScannerViewHandle>(null);
   const { isCameraOpen, setCameraOpen, progress, homeOpacity } = useScanCamera();
   const bottomInset = useScreenBottomInset();
+  const leftInset = useScreenLeftInset();
   const isFocused = useIsFocused();
 
   const animateTo = useCallback(
@@ -99,7 +101,7 @@ export default function Scan() {
   });
 
   return (
-    <View style={[styles.container, isLandscape && styles.containerLandscape]}>
+    <View style={[styles.container, isLandscape && styles.containerLandscape, { paddingLeft: leftInset }]}>
       <Animated.View
         style={[StyleSheet.absoluteFill, { opacity: cameraOpacity }]}
         pointerEvents={isCameraOpen ? "box-none" : "none"}
@@ -110,12 +112,17 @@ export default function Scan() {
       </Animated.View>
 
       <Animated.View
-        style={[styles.topSection, isLandscape && styles.topSectionLandscape, { opacity: homeOpacity }]}
+        style={[
+          styles.topSection,
+          tablet && styles.topSectionTablet,
+          isLandscape && styles.topSectionLandscape,
+          { opacity: homeOpacity },
+        ]}
         pointerEvents={isCameraOpen ? "none" : "box-none"}
         importantForAccessibility={isCameraOpen ? "no-hide-descendants" : "auto"}
         accessibilityElementsHidden={isCameraOpen}
       >
-        <Header />
+        {tablet ? null : <Header />}
 
         <View style={styles.pillsRow}>
           <ChoosAccount />
@@ -194,6 +201,9 @@ export const styles = StyleSheet.create({
   },
   containerLandscape: {
     flexDirection: "row",
+  },
+  topSectionTablet: {
+    paddingTop: 32,
   },
   topSectionLandscape: {
     flex: 0,

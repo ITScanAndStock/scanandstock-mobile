@@ -7,7 +7,7 @@ import type { SvgProps } from "react-native-svg";
 import { colors } from "../constants/colors";
 import { isTablet } from "../constants/layout";
 import { useScanCamera } from "../context/ScanCameraContext";
-import { NavigationEntry } from "../services/NavigationEntries";
+import { ActiveNavigationEntry, NavigationEntry } from "../services/NavigationEntries";
 
 const TAB_BAR_CONTENT_HEIGHT = 50;
 
@@ -18,6 +18,24 @@ type TabBarProps = BottomTabBarProps & {
   icons: TabBarIcons;
 };
 
+export function tabTarget(
+  { state, navigation }: Pick<BottomTabBarProps, "state" | "navigation">,
+  entry: ActiveNavigationEntry,
+) {
+  const route = state.routes.find((candidate) => candidate.name === entry.route);
+  if (!route) {
+    return null;
+  }
+  const isFocused = route.key === state.routes[state.index].key;
+  const onPress = () => {
+    const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
+    if (!isFocused && !event.defaultPrevented) {
+      navigation.navigate(route.name, route.params);
+    }
+  };
+  return { isFocused, onPress };
+}
+
 export function useScreenBottomInset() {
   const insets = useSafeAreaInsets();
   return isTablet() ? insets.bottom : TAB_BAR_CONTENT_HEIGHT + insets.bottom;
@@ -25,7 +43,6 @@ export function useScreenBottomInset() {
 
 export default function TabBar({ state, navigation, insets, entries, icons }: TabBarProps) {
   const { isCameraOpen, homeOpacity } = useScanCamera();
-  const focusedRoute = state.routes[state.index];
 
   return (
     <Animated.View
@@ -36,20 +53,16 @@ export default function TabBar({ state, navigation, insets, entries, icons }: Ta
       accessibilityRole="tablist"
     >
       {entries.map((entry) => {
-        const route = state.routes.find((candidate) => candidate.name === entry.route);
-        if (!route) {
+        if (entry.state !== "active") {
           return null;
         }
-        const isFocused = route.key === focusedRoute.key;
+        const target = tabTarget({ state, navigation }, entry);
+        if (!target) {
+          return null;
+        }
+        const { isFocused, onPress } = target;
         const tint = isFocused ? colors.GREEN_DARK : colors.MUTED;
         const Icon = icons[entry.icon];
-
-        const onPress = () => {
-          const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
-          if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name, route.params);
-          }
-        };
 
         return (
           <Pressable

@@ -21,4 +21,9 @@ export const colors = {
   RADIO_BORDER: "#9AA6AD",
   TAB_BAR_BORDER: "#DDE3E6",
   SCREEN_BG: "#F4F6F7",
+  RAIL_BG: "#1C2529",
+  RAIL_MUTED: "#B8C2C7",
+  RAIL_ACTIVE_BG: "rgba(18,161,154,0.22)",
+  RAIL_BUTTON: "rgba(255,255,255,0.08)",
+  AVATAR_TEXT: "#1C2A30",
 };

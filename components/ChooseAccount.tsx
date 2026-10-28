@@ -5,6 +5,7 @@ import ChevronDown from "../assets/images/figma/chevron-down.svg";
 import { colors } from "../constants/colors";
 import { useAccount } from "../context/AccountContext";
 import { Account } from "../model/Account";
+import AccountOption, { accountListStyles } from "./AccountOption";
 
 export default function ChoosAccount() {
   const { accounts, activeAccount, setActiveAccount } = useAccount();
@@ -82,6 +83,7 @@ export default function ChoosAccount() {
         <Animated.View
           pointerEvents={isOpen ? "auto" : "none"}
           style={[
+            accountListStyles.list,
             styles.dropdownContainer,
             {
               opacity: menuOpacity,
@@ -90,25 +92,14 @@ export default function ChoosAccount() {
           ]}
           accessible={false}
         >
-          {accounts.map((item) => {
-            const isSelected = item.id === activeAccount?.id;
-            return (
-              <TouchableOpacity
-                key={item.id}
-                onPress={() => chooseAccount(item)}
-                style={styles.items}
-                accessible={true}
-                accessibilityRole="radio"
-                accessibilityLabel={item.name}
-                accessibilityState={{ selected: isSelected, checked: isSelected }}
-                accessibilityHint="Appuyez pour changer de compte"
-              >
-                <Text style={styles.itemText} numberOfLines={1}>
-                  {item.name}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+          {accounts.map((item) => (
+            <AccountOption
+              key={item.id}
+              account={item}
+              isSelected={item.id === activeAccount?.id}
+              onChoose={chooseAccount}
+            />
+          ))}
         </Animated.View>
       ) : null}
     </View>
@@ -135,31 +126,11 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 48,
     left: 0,
-    width: 240,
-    backgroundColor: colors.MUTED,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.DARK,
-    paddingVertical: 4,
   },
   text: {
     color: colors.WHITE,
     fontSize: 14,
     fontFamily: "SemiBold",
     maxWidth: 140,
-  },
-  itemText: {
-    flexShrink: 1,
-    color: colors.WHITE,
-    fontSize: 14,
-    fontFamily: "SemiBold",
-  },
-  items: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    gap: 20,
   },
 });
