@@ -19,4 +19,6 @@ export const colors = {
   OPTION_BORDER: "#E3E8EA",
   OPTION_SELECTED_BG: "#F3FAF9",
   RADIO_BORDER: "#9AA6AD",
+  TAB_BAR_BORDER: "#DDE3E6",
+  SCREEN_BG: "#F4F6F7",
 };

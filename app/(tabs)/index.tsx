@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -11,16 +11,18 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useIsFocused } from "expo-router";
 
 import ScanProductIcon from "../../assets/images/figma/scan-product.svg";
 import ChoosAccount from "../../components/ChooseAccount";
 import Header from "../../components/Header";
 import ScanBadge from "../../components/ScanBadge";
 import ScannerView, { ScannerViewHandle } from "../../components/ScannerView";
+import { useScreenBottomInset } from "../../components/TabBar";
 import MovementRow, { MOVEMENT_ROW_HEIGHT } from "../../components/ui-components/MovementRow";
 import { colors } from "@/constants/colors";
 import { isTablet } from "@/constants/layout";
+import { useScanCamera } from "@/context/ScanCameraContext";
 import { useStats } from "@/hooks/useStats";
 
 const PHONE_VISIBLE_MOVEMENTS = 3;
@@ -30,13 +32,13 @@ const CLOSE_DURATION_MS = 400;
 export default function Scan() {
   const { stats, isLoading } = useStats();
   const recentStats = stats?.slice(0, 5) ?? [];
-  const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   const tablet = isTablet();
   const scannerRef = useRef<ScannerViewHandle>(null);
-  const [isCameraOpen, setCameraOpen] = useState(false);
-  const [progress] = useState(() => new Animated.Value(0));
+  const { isCameraOpen, setCameraOpen, progress, homeOpacity } = useScanCamera();
+  const bottomInset = useScreenBottomInset();
+  const isFocused = useIsFocused();
 
   const animateTo = useCallback(
     (toValue: number, duration: number) => {
@@ -63,7 +65,13 @@ export default function Scan() {
     scannerRef.current?.close();
     setCameraOpen(false);
     animateTo(0, CLOSE_DURATION_MS);
-  }, [animateTo]);
+  }, [animateTo, setCameraOpen]);
+
+  useEffect(() => {
+    if (!isFocused && isCameraOpen) {
+      closeCamera();
+    }
+  }, [isFocused, isCameraOpen, closeCamera]);
 
   useEffect(() => {
     if (!isCameraOpen) {
@@ -83,11 +91,6 @@ export default function Scan() {
   const movementsOpacity = progress.interpolate({
     inputRange: [0, 0.55, 1],
     outputRange: [1, 0.7, 0],
-  });
-  const homeOpacity = progress.interpolate({
-    inputRange: [0, 0.6],
-    outputRange: [1, 0],
-    extrapolate: "clamp",
   });
   const cameraOpacity = progress.interpolate({
     inputRange: [0.25, 1],
@@ -145,7 +148,7 @@ export default function Scan() {
           styles.movementsPanel,
           isLandscape && styles.movementsPanelLandscape,
           {
-            paddingBottom: 8 + insets.bottom,
+            paddingBottom: 8 + bottomInset,
             opacity: movementsOpacity,
             transform: [isLandscape ? { translateX: movementsOffset } : { translateY: movementsOffset }],
           },
