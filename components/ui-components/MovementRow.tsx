@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { colors } from "@/constants/colors";
 import { StatsModel } from "@/model/Stats";
+import { movementDirection } from "@/services/MovementDirection";
 
 function formatMovementTime(dateStr: string): string {
   const date = new Date(dateStr);
@@ -23,24 +24,12 @@ function formatMovementTime(dateStr: string): string {
   return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
 }
 
-function isIncrease(type: string, quantity: number): boolean {
-  if (type === "increase" || type === "in" || type === "entrée") {
-    return true;
-  }
-  if (type === "decrease" || type === "out" || type === "sortie") {
-    return false;
-  }
-  return quantity >= 0;
-}
-
 interface MovementRowProps {
   item: StatsModel;
 }
 
 export default function MovementRow({ item }: MovementRowProps) {
-  const increase = isIncrease(item.type, item.quantity);
-  const absoluteQty = Math.abs(item.quantity);
-  const label = increase ? `+${absoluteQty}` : `−${absoluteQty}`;
+  const { increase, label } = movementDirection(item);
 
   return (
     <View

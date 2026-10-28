@@ -1,10 +1,19 @@
 // import react
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import type { Ref } from "react";
 
 // import react native
 import {
   Alert,
+  BackHandler,
   Button,
   Pressable,
   StyleSheet,
@@ -29,13 +38,20 @@ import InformationBanner from "@/components/ui-components/InformationBanner";
 import { colors } from "@/constants/colors";
 import { useAccount } from "@/context/AccountContext";
 import { AxiosErrorType } from "@/model/ApiError";
+import BatchService from "@/services/BatchService";
+import { isBatchChoiceRequired } from "@/services/MovementErrorToast";
 import ToastService from "@/services/ToastService";
+import HeaderStore from "@/state/HeaderStore";
+import RememberedBatchStore from "@/state/RememberedBatchStore";
+import BatchSheet from "./BatchSheet";
 import MouvementButton from "./MouvementButton";
 import ScanBadge from "./ScanBadge";
 import ScanLoader from "./ScanLoader";
 import { useStats } from "../hooks/useStats";
 import { Method } from "../model/Stock";
 import ProductService from "../services/ProductService";
+import { movementDirection } from "../services/MovementDirection";
+import { BatchChoiceFeedback, createBatchChoice } from "../services/BatchChoice";
 import { createScanGate } from "../services/ScanGate";
 
 const audioSourceSucces = require("../assets/sounds/ok.mp3");
@@ -96,11 +112,41 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
   const badgeProcessingRef = useRef(false);
   const badgeRequestInFlightRef = useRef(false);
   const openCountRef = useRef(0);
+  const [batchChoice] = useState(() =>
+    createBatchChoice({
+      gate: scanGate,
+      service: BatchService,
+      rememberedBatches: RememberedBatchStore,
+      isTracingEnabled: HeaderStore.isTracingEnabled,
+      isBadgeValid,
+      scanSent,
+      now: Date.now,
+    }),
+  );
+  const batchState = useSyncExternalStore(batchChoice.subscribe, batchChoice.getState);
+  const activeAccountId = activeAccount?.id;
+
+  const batchFeedback = useMemo<BatchChoiceFeedback>(
+    () => ({
+      onSucceeded: ({ message }) => {
+        ToastService.success(message.split("<br/>")[0], "Succès");
+        refreshStats();
+        Vibration.vibrate(100);
+        playerSuccess.seekTo(0);
+        playerSuccess.play();
+      },
+      onFailed: (...toast) => {
+        ToastService.error(...toast);
+        Vibration.vibrate(100);
+        playerError.seekTo(0);
+        playerError.play();
+      },
+    }),
+    [refreshStats, playerSuccess, playerError],
+  );
 
   const lastScan = stats && stats.length > 0 ? stats[0] : null;
-  const lastScanIncrease =
-    lastScan?.type === "increase" || lastScan?.type === "in" || (lastScan?.quantity ?? 0) > 0;
-  const lastScanQty = Math.abs(lastScan?.quantity ?? 1);
+  const lastScanDirection = lastScan ? movementDirection(lastScan) : null;
 
   const handleMethodChange = useCallback((newMethod: Method) => {
     setMethod(newMethod);
@@ -130,6 +176,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
       },
       close: () => {
         activeRef.current = false;
+        batchChoice.cameraClosed();
         scanGate.cameraClosed(Date.now());
         for (const timer of [bannerTimeoutRef, badgeTimeoutRef]) {
           if (timer.current) {
@@ -142,7 +189,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
         cameraRef.current?.pausePreview();
       },
     }),
-    [handleMethodChange, scanGate],
+    [handleMethodChange, scanGate, batchChoice],
   );
 
   const handleCameraReady = () => {
@@ -196,6 +243,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
 
       const sendScan = (force: boolean) => {
         setIsProcessing(true);
+        const openCount = openCountRef.current;
 
         Vibration.vibrate(100);
 
@@ -239,6 +287,12 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
                 // Android drops cancelable for an alert raised in the background, so Back can still close it.
                 { cancelable: false, onDismiss: () => scanGate.alertCancelled(Date.now()) },
               );
+            } else if (isBatchChoiceRequired(error.response)) {
+              if (activeRef.current && openCountRef.current === openCount) {
+                batchChoice.start(cleanedCode, batchFeedback);
+              } else {
+                scanGate.sendFinished(false);
+              }
             } else {
               scanGate.sendFinished(false);
               playerError.seekTo(0);
@@ -252,7 +306,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
 
       sendScan(false);
     },
-    [scanGate, method, refreshStats, playerSuccess, playerError, scanSent],
+    [scanGate, batchChoice, batchFeedback, method, refreshStats, playerSuccess, playerError, scanSent],
   );
 
   const barcodeScannerSettings = useMemo(
@@ -272,6 +326,27 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
       handleBarcodeScanned({ data } as BarcodeScanningResult);
     }
   };
+
+  useEffect(() => {
+    if (batchState.kind !== "open") {
+      return;
+    }
+    // Registered after the home screen's handler, so Back closes the sheet before the camera.
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      batchChoice.cancel();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [batchState.kind, batchChoice]);
+
+  // The remembered batch belongs to the account and the session: forgotten on a switch and at logout.
+  useEffect(
+    () => () => {
+      batchChoice.cameraClosed();
+      batchChoice.forgetRememberedBatches();
+    },
+    [batchChoice, activeAccountId],
+  );
 
   useEffect(() => {
     return () => {
@@ -356,11 +431,11 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
         </View>
 
         <View style={styles.bottomBlock}>
-          {lastScan ? (
+          {lastScan && lastScanDirection ? (
             <View
               style={styles.lastScanCard}
               accessible={true}
-              accessibilityLabel={`Dernier scan: ${lastScan.designation}, ${lastScanIncrease ? "+" : "−"}${lastScanQty}`}
+              accessibilityLabel={`Dernier scan: ${lastScan.designation}, ${lastScanDirection.label}`}
             >
               <View style={styles.lastScanText}>
                 <Text style={styles.lastScanLabel}>Dernier scan</Text>
@@ -371,16 +446,16 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
               <View
                 style={[
                   styles.lastScanBadge,
-                  lastScanIncrease ? styles.lastScanBadgeIn : styles.lastScanBadgeOut,
+                  lastScanDirection.increase ? styles.lastScanBadgeIn : styles.lastScanBadgeOut,
                 ]}
               >
                 <Text
                   style={[
                     styles.lastScanBadgeText,
-                    lastScanIncrease ? styles.lastScanBadgeTextIn : styles.lastScanBadgeTextOut,
+                    lastScanDirection.increase ? styles.lastScanBadgeTextIn : styles.lastScanBadgeTextOut,
                   ]}
                 >
-                  {lastScanIncrease ? `+${lastScanQty}` : `−${lastScanQty}`}
+                  {lastScanDirection.label}
                 </Text>
               </View>
             </View>
@@ -401,7 +476,20 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
         </View>
       </View>
 
-      <ScanLoader visible={isProcessing || isBadgeProcessing} />
+      {batchState.kind === "open" || batchState.kind === "sending" ? (
+        <BatchSheet
+          designation={batchState.designation}
+          batches={batchState.batches}
+          onWithdraw={(batch) => batchChoice.withdraw(batch, batchFeedback)}
+          onCancel={batchChoice.cancel}
+        />
+      ) : null}
+
+      <ScanLoader
+        visible={
+          isProcessing || isBadgeProcessing || batchState.kind === "loading" || batchState.kind === "sending"
+        }
+      />
     </View>
   );
 }

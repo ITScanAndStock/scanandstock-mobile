@@ -3,6 +3,7 @@ import { StatsResponse } from "../model/Stats";
 import { Method, StockModel } from "../model/Stock";
 import HeaderStore from "../state/HeaderStore";
 import apiClient from "./ApiService";
+import { movementErrorToast } from "./MovementErrorToast";
 import ToastService from "./ToastService";
 
 class ProductService {
@@ -51,34 +52,13 @@ class ProductService {
         console.error("Message:", axiosError.response?.data);
         console.error("URL:", axiosError.config?.url);
       }
-      if (!axiosError.response) {
-        // The stock may have moved server-side, so the scan is never replayed.
-        ToastService.error(
-          "Le scan a peut-être été enregistré : vérifiez le stock avant de scanner à nouveau.",
-          "Pas de réponse du serveur",
-        );
-      } else if (axiosError.response.status === 417) {
-        if (axiosError.config?.headers?.["Badge-Id"]) {
-          ToastService.error(
-            "Touchez la pastille de votre badge pour le retirer, puis scannez un badge actif.",
-            "Badge refusé",
-            6000,
-          );
-        } else if (HeaderStore.isTracingEnabled()) {
-          ToastService.error(
-            "Scannez votre badge puis recommencez.",
-            "Badge requis",
-            6000,
-          );
-        } else {
-          ToastService.error(
-            "Le traçage par badge est activé sur votre compte : déconnectez-vous puis reconnectez-vous.",
-            "Badge requis",
-            6000,
-          );
-        }
-      } else if (axiosError.response.status !== 409) {
-        ToastService.error("Erreur lors du scan du produit");
+      const toast = movementErrorToast({
+        response: axiosError.response,
+        badgeSent: !!axiosError.config?.headers?.["Badge-Id"],
+        tracingEnabled: HeaderStore.isTracingEnabled(),
+      });
+      if (toast) {
+        ToastService.error(...toast);
       }
       throw error;
     }
