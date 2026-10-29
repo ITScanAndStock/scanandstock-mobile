@@ -26,14 +26,7 @@ function AppStack() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="(tabs)"
-        options={{
-          presentation: "modal",
-          animationTypeForReplace: "push",
-          animation: "slide_from_left",
-        }}
-      />
+      <Stack.Screen name="(tabs)" options={{ animation: "none" }} />
     </Stack>
   );
 }

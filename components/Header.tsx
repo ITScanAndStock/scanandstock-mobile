@@ -7,18 +7,10 @@ import Logo from "../assets/images/logo.svg";
 
 // import constants
 import { colors } from "../constants/colors";
-import { useAccount } from "../context/AccountContext";
-import { useAuth } from "../context/AuthContext";
+import { useLogout } from "../hooks/useLogout";
 
-// header of the application
 export default function Header() {
-  const { logout } = useAuth();
-  const { resetAccount } = useAccount();
-
-  const handleLogout = () => {
-    resetAccount();
-    logout();
-  };
+  const handleLogout = useLogout();
 
   return (
     <View style={styles.container}>

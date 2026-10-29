@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -11,16 +11,19 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useIsFocused } from "expo-router";
 
 import ScanProductIcon from "../../assets/images/figma/scan-product.svg";
 import ChoosAccount from "../../components/ChooseAccount";
 import Header from "../../components/Header";
 import ScanBadge from "../../components/ScanBadge";
 import ScannerView, { ScannerViewHandle } from "../../components/ScannerView";
+import { useScreenLeftInset } from "../../components/SideRail";
+import { useScreenBottomInset } from "../../components/TabBar";
 import MovementRow, { MOVEMENT_ROW_HEIGHT } from "../../components/ui-components/MovementRow";
 import { colors } from "@/constants/colors";
 import { isTablet } from "@/constants/layout";
+import { useScanCamera } from "@/context/ScanCameraContext";
 import { useStats } from "@/hooks/useStats";
 
 const PHONE_VISIBLE_MOVEMENTS = 3;
@@ -30,13 +33,14 @@ const CLOSE_DURATION_MS = 400;
 export default function Scan() {
   const { stats, isLoading } = useStats();
   const recentStats = stats?.slice(0, 5) ?? [];
-  const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   const tablet = isTablet();
   const scannerRef = useRef<ScannerViewHandle>(null);
-  const [isCameraOpen, setCameraOpen] = useState(false);
-  const [progress] = useState(() => new Animated.Value(0));
+  const { isCameraOpen, setCameraOpen, progress, homeOpacity } = useScanCamera();
+  const bottomInset = useScreenBottomInset();
+  const leftInset = useScreenLeftInset();
+  const isFocused = useIsFocused();
 
   const animateTo = useCallback(
     (toValue: number, duration: number) => {
@@ -63,7 +67,13 @@ export default function Scan() {
     scannerRef.current?.close();
     setCameraOpen(false);
     animateTo(0, CLOSE_DURATION_MS);
-  }, [animateTo]);
+  }, [animateTo, setCameraOpen]);
+
+  useEffect(() => {
+    if (!isFocused && isCameraOpen) {
+      closeCamera();
+    }
+  }, [isFocused, isCameraOpen, closeCamera]);
 
   useEffect(() => {
     if (!isCameraOpen) {
@@ -84,11 +94,6 @@ export default function Scan() {
     inputRange: [0, 0.55, 1],
     outputRange: [1, 0.7, 0],
   });
-  const homeOpacity = progress.interpolate({
-    inputRange: [0, 0.6],
-    outputRange: [1, 0],
-    extrapolate: "clamp",
-  });
   const cameraOpacity = progress.interpolate({
     inputRange: [0.25, 1],
     outputRange: [0, 1],
@@ -96,7 +101,7 @@ export default function Scan() {
   });
 
   return (
-    <View style={[styles.container, isLandscape && styles.containerLandscape]}>
+    <View style={[styles.container, isLandscape && styles.containerLandscape, { paddingLeft: leftInset }]}>
       <Animated.View
         style={[StyleSheet.absoluteFill, { opacity: cameraOpacity }]}
         pointerEvents={isCameraOpen ? "box-none" : "none"}
@@ -107,12 +112,17 @@ export default function Scan() {
       </Animated.View>
 
       <Animated.View
-        style={[styles.topSection, isLandscape && styles.topSectionLandscape, { opacity: homeOpacity }]}
+        style={[
+          styles.topSection,
+          tablet && styles.topSectionTablet,
+          isLandscape && styles.topSectionLandscape,
+          { opacity: homeOpacity },
+        ]}
         pointerEvents={isCameraOpen ? "none" : "box-none"}
         importantForAccessibility={isCameraOpen ? "no-hide-descendants" : "auto"}
         accessibilityElementsHidden={isCameraOpen}
       >
-        <Header />
+        {tablet ? null : <Header />}
 
         <View style={styles.pillsRow}>
           <ChoosAccount />
@@ -145,7 +155,7 @@ export default function Scan() {
           styles.movementsPanel,
           isLandscape && styles.movementsPanelLandscape,
           {
-            paddingBottom: 8 + insets.bottom,
+            paddingBottom: 8 + bottomInset,
             opacity: movementsOpacity,
             transform: [isLandscape ? { translateX: movementsOffset } : { translateY: movementsOffset }],
           },
@@ -191,6 +201,9 @@ export const styles = StyleSheet.create({
   },
   containerLandscape: {
     flexDirection: "row",
+  },
+  topSectionTablet: {
+    paddingTop: 32,
   },
   topSectionLandscape: {
     flex: 0,

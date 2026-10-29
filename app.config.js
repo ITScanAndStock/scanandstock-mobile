@@ -23,6 +23,8 @@ const getEnvVars = () => {
       "https://staging-api.mycoompy.fr/api",
     EXPO_PUBLIC_MY_COOMPY_URL:
       process.env.EXPO_PUBLIC_MY_COOMPY_URL || "https://staging.mycoompy.fr",
+    EXPO_PUBLIC_SHOW_LOCKED_NAV:
+      process.env.EXPO_PUBLIC_SHOW_LOCKED_NAV || "true",
   };
 };
 
@@ -133,6 +135,7 @@ export default {
       API_URL: envVars.EXPO_PUBLIC_API_URL,
       COOMPY_URL: envVars.EXPO_PUBLIC_COOMPY_URL,
       MY_COOMPY_URL: envVars.EXPO_PUBLIC_MY_COOMPY_URL,
+      SHOW_LOCKED_NAV: envVars.EXPO_PUBLIC_SHOW_LOCKED_NAV,
     },
     runtimeVersion: {
       policy: "appVersion",
