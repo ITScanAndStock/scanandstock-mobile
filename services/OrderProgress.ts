@@ -1,4 +1,4 @@
-import type { OrderItem } from "../model/Order";
+import type { Order, OrderItem } from "../model/Order";
 
 export type OrderProgress = { received: number; ordered: number; finishedLines: number; lines: number };
 
@@ -17,4 +17,8 @@ export function orderProgress(items: readonly OrderItem[]): OrderProgress {
     finishedLines: items.filter((item) => remainingQuantity(item) === 0).length,
     lines: items.length,
   };
+}
+
+export function isReceivable(order: Order): boolean {
+  return order.orderStatus === "pending" || order.orderStatus === "partial";
 }

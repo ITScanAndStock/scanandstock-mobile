@@ -5,14 +5,20 @@ import { useNavigation, useRouter } from "expo-router";
 import Header from "../../../components/Header";
 import { LoadFailed, Loading, styles as loadStyles } from "../../../components/LoadState";
 import OrderCard from "../../../components/OrderCard";
+import OrderDetailPane from "../../../components/OrderDetailPane";
 import { useScreenLeftInset } from "../../../components/SideRail";
 import { useScreenBottomInset } from "../../../components/TabBar";
 import { colors } from "@/constants/colors";
 import { isTablet } from "@/constants/layout";
 import { useAccount } from "@/context/AccountContext";
+import { useIsLandscape } from "@/hooks/useIsLandscape";
 import { type OrderListFilter, useOrderList } from "@/hooks/useOrderList";
+import { shownOrder } from "@/services/OrderSelection";
 
 const TABLET_GUTTER = 28;
+const TABLET_SPACING = 24;
+const LIST_WIDTH_LANDSCAPE = 360;
+const LIST_WIDTH_PORTRAIT = 340;
 
 const EMPTY_MESSAGES: Record<OrderListFilter, string> = {
   toReceive: "Aucune commande à réceptionner",
@@ -29,6 +35,12 @@ export default function Orders() {
   const accountId = activeAccount?.id;
   const [filter, setFilter] = useState<OrderListFilter>("toReceive");
   const { toReceive, all, failed, loadingMore, loadMore, retry } = useOrderList(accountId);
+  const landscape = useIsLandscape();
+  const [selection, setSelection] = useState<{ accountId: string; orderId: number } | null>(null);
+  // Cleared, not just hidden: coming back to the first account must not bring its order back.
+  if (selection && selection.accountId !== accountId) {
+    setSelection(null);
+  }
 
   // A key on the Stack would not do: React Navigation rebuilds a remounted navigator from the parent route's state.
   useEffect(() => {
@@ -38,6 +50,7 @@ export default function Orders() {
   }, [accountId, navigation]);
 
   const orders = filter === "toReceive" ? toReceive?.orders : all?.orders;
+  const selectedOrder = tablet ? shownOrder(selection?.orderId, orders) : undefined;
   const toReceiveLabel = toReceive ? `À réceptionner (${toReceive.count})` : "À réceptionner";
 
   const filters = (
@@ -77,7 +90,14 @@ export default function Orders() {
         renderItem={({ item }) => (
           <OrderCard
             order={item}
-            onPress={() => router.push({ pathname: "/orders/[orderId]", params: { orderId: String(item.orderId) } })}
+            selected={tablet && item.orderId === selectedOrder?.orderId}
+            onPress={() => {
+              if (tablet && accountId) {
+                setSelection({ accountId, orderId: item.orderId });
+              } else {
+                router.push({ pathname: "/orders/[orderId]", params: { orderId: String(item.orderId) } });
+              }
+            }}
           />
         )}
         contentContainerStyle={[styles.list, tablet && styles.listTablet, orders.length === 0 && styles.listEmpty]}
@@ -101,7 +121,12 @@ export default function Orders() {
           </Text>
           {filters}
         </View>
-        {body}
+        <View style={styles.columns}>
+          <View style={{ width: landscape ? LIST_WIDTH_LANDSCAPE : LIST_WIDTH_PORTRAIT }}>{body}</View>
+          <View style={styles.detailColumn}>
+            <OrderDetailPane accountId={accountId} order={selectedOrder} tableLayout={landscape} />
+          </View>
+        </View>
       </View>
     );
   }
@@ -191,8 +216,17 @@ const styles = StyleSheet.create({
   },
   listTablet: {
     paddingHorizontal: 0,
-    paddingTop: 24,
-    maxWidth: 360,
+    paddingTop: TABLET_SPACING,
+  },
+  columns: {
+    flex: 1,
+    flexDirection: "row",
+    gap: TABLET_SPACING,
+  },
+  detailColumn: {
+    flex: 1,
+    paddingTop: TABLET_SPACING,
+    paddingBottom: 16,
   },
   listEmpty: {
     flexGrow: 1,

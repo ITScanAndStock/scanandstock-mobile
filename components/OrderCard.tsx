@@ -42,7 +42,9 @@ export function OrderStatusPill({ order }: { order: Order }) {
   );
 }
 
-export default function OrderCard({ order, onPress }: { order: Order; onPress: () => void }) {
+type OrderCardProps = { order: Order; onPress: () => void; selected?: boolean };
+
+export default function OrderCard({ order, onPress, selected = false }: OrderCardProps) {
   const date = formatOrderDate(order.orderDate);
   const status = orderStatusLabel(order);
   const providers = providerNames(order);
@@ -52,9 +54,10 @@ export default function OrderCard({ order, onPress }: { order: Order; onPress: (
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed, selected && styles.cardSelected]}
       onPress={onPress}
       accessibilityRole="button"
+      accessibilityState={{ selected }}
       accessibilityLabel={[`Commande du ${date}`, status, providers, meta].filter(Boolean).join(", ")}
     >
       <View style={styles.top}>
@@ -82,6 +85,13 @@ const styles = StyleSheet.create({
   },
   cardPressed: {
     backgroundColor: colors.OPTION_SELECTED_BG,
+  },
+  cardSelected: {
+    borderWidth: 2,
+    borderColor: colors.GREEN_DARK,
+    backgroundColor: colors.OPTION_SELECTED_BG,
+    paddingVertical: 13,
+    paddingHorizontal: 15,
   },
   top: {
     flexDirection: "row",

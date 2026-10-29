@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { OrderItem } from "../../model/Order";
-import { orderProgress, receivedRatio, remainingQuantity } from "../OrderProgress";
+import type { Order, OrderItem, OrderStatus } from "../../model/Order";
+import { isReceivable, orderProgress, receivedRatio, remainingQuantity } from "../OrderProgress";
 
 function item(orderItemId: number, itemDeliveredQuantity: number, itemQuantity: number): OrderItem {
   return { orderItemId, itemProductId: 500, itemProviderId: 3, itemDesignation: "Gants nitrile M", itemQuantity, itemDeliveredQuantity };
@@ -39,5 +39,19 @@ describe("receivedRatio", () => {
 
   it("shows a line ordered at 0 as full (catches: 0 / 0 giving a NaN width)", () => {
     expect(receivedRatio(item(5, 0, 0))).toBe(1);
+  });
+});
+
+describe("isReceivable", () => {
+  const order = (orderStatus: OrderStatus): Order => ({ orderId: 1, orderDate: "2026-10-18 09:05:00+00:00", orderStatus });
+
+  it("offers the reception for an order in progress or partial (catches: one of the two statuses left out)", () => {
+    expect(isReceivable(order("pending"))).toBe(true);
+    expect(isReceivable(order("partial"))).toBe(true);
+  });
+
+  it("does not offer it for a complete or closed order (catches: always receivable)", () => {
+    expect(isReceivable(order("complete"))).toBe(false);
+    expect(isReceivable(order("closed"))).toBe(false);
   });
 });

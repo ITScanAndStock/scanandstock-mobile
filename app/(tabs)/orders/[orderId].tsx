@@ -1,27 +1,23 @@
-import { useCallback, useEffect, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 
 import ChevronBack from "../../../assets/images/figma/chevron-back.svg";
 import Header from "../../../components/Header";
-import { LoadFailed, Loading, styles as loadStyles } from "../../../components/LoadState";
 import { formatPrice, OrderStatusPill, providerNames } from "../../../components/OrderCard";
+import OrderItemsBody from "../../../components/OrderItemsBody";
+import ReceptionNote from "../../../components/ReceptionNote";
 import { useScreenLeftInset } from "../../../components/SideRail";
 import { useScreenBottomInset } from "../../../components/TabBar";
 import { colors } from "@/constants/colors";
 import { isTablet } from "@/constants/layout";
 import { useAccount } from "@/context/AccountContext";
-import type { OrderItem } from "@/model/Order";
-import { canReceiveOrders } from "@/services/AccessToken";
+import { useOrderItems } from "@/hooks/useOrderItems";
 import { formatOrderDate } from "@/services/OrderDate";
-import { orderProgress, receivedRatio, remainingQuantity } from "@/services/OrderProgress";
-import OrderService, { AccountChangedError } from "@/services/OrderService";
-import SecureStorageService from "@/services/SecureStorageService";
+import { orderProgress } from "@/services/OrderProgress";
 import OrderCache from "@/state/OrderCache";
 
 const TABLET_GUTTER = 28;
-
-type ItemsState = { items?: OrderItem[]; failed: boolean };
 
 export default function OrderDetail() {
   const tablet = isTablet();
@@ -33,9 +29,7 @@ export default function OrderDetail() {
   const { activeAccount } = useAccount();
   const accountId = activeAccount?.id;
   const order = accountId ? OrderCache.get(accountId, Number(orderId)) : undefined;
-  const [state, setState] = useState<ItemsState>({ failed: false });
-  const [attempt, setAttempt] = useState(0);
-  const [canReceive, setCanReceive] = useState<boolean | null>(null);
+  const { items, failed, retry } = useOrderItems(accountId, order);
 
   const goToList = useCallback(() => {
     if ((navigation.getState()?.index ?? 0) > 0) {
@@ -52,76 +46,12 @@ export default function OrderDetail() {
     }
   }, [accountId, order, goToList]);
 
-  // Read on every opening: the token is rewritten under "token" at each refresh, so the right follows it offline.
-  useEffect(() => {
-    let cancelled = false;
-    SecureStorageService.getToken().then((token) => {
-      if (!cancelled) {
-        setCanReceive(canReceiveOrders(token));
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!accountId || !order) {
-      return;
-    }
-    let cancelled = false;
-    OrderService.getOrderItems(accountId, order.orderId).then(
-      (items) => {
-        if (!cancelled) {
-          setState({ items, failed: false });
-        }
-      },
-      (error) => {
-        if (cancelled || error instanceof AccountChangedError) {
-          return;
-        }
-        if (__DEV__) {
-          console.error("❌ Erreur lors du chargement du détail de la commande", error);
-        }
-        setState((previous) => ({ ...previous, failed: true }));
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [accountId, order, attempt]);
-
   if (!order) {
     return <View style={styles.container} />;
   }
 
-  const items = state.items;
   const progress = items ? orderProgress(items) : null;
   const summary = [providerNames(order), formatPrice(order.orderPrice)].filter(Boolean).join(" · ");
-  const receivable = order.orderStatus === "pending" || order.orderStatus === "partial";
-
-  const retry = () => {
-    setState({ failed: false });
-    setAttempt((previous) => previous + 1);
-  };
-
-  let body;
-  if (state.failed && !items) {
-    body = <LoadFailed message="Impossible de charger la commande" onRetry={retry} />;
-  } else if (!items) {
-    body = <Loading label="Chargement de la commande" />;
-  } else {
-    body = (
-      <FlatList
-        data={items}
-        keyExtractor={(item) => String(item.orderItemId)}
-        renderItem={({ item }) => <OrderLine item={item} />}
-        contentContainerStyle={[styles.list, items.length === 0 && styles.listEmpty]}
-        ItemSeparatorComponent={Separator}
-        ListEmptyComponent={<Text style={loadStyles.message}>Aucune ligne dans cette commande</Text>}
-      />
-    );
-  }
 
   return (
     <View style={[styles.container, { paddingLeft: leftInset, paddingBottom: bottomInset }]}>
@@ -159,12 +89,8 @@ export default function OrderDetail() {
           </View>
         ) : null}
       </View>
-      {body}
-      {receivable && canReceive === false ? (
-        <View style={styles.footer}>
-          <Text style={styles.note}>La réception est réservée aux personnes habilitées de votre cabinet</Text>
-        </View>
-      ) : null}
+      <OrderItemsBody items={items} failed={failed} onRetry={retry} tableLayout={false} contentContainerStyle={styles.list} />
+      <ReceptionNote order={order} style={styles.footer} />
     </View>
   );
 }
@@ -176,42 +102,6 @@ function Tile({ label, value }: { label: string; value: string }) {
       <Text style={styles.tileValue}>{value}</Text>
     </View>
   );
-}
-
-function OrderLine({ item }: { item: OrderItem }) {
-  const remaining = remainingQuantity(item);
-  const finished = remaining === 0;
-  const receivers = item.receivers?.length ? `reçu par ${item.receivers.join(", ")}` : null;
-  const note = [finished ? "Terminée" : `Reste ${remaining}`, receivers].filter(Boolean).join(" · ");
-  const quantities = `${item.itemDeliveredQuantity} / ${item.itemQuantity}`;
-
-  return (
-    <View
-      style={styles.line}
-      accessible={true}
-      accessibilityLabel={`${item.itemDesignation}, reçu ${quantities}, ${note}`}
-    >
-      <View style={styles.lineTop}>
-        <Text style={styles.designation} numberOfLines={1} ellipsizeMode="tail">
-          {item.itemDesignation}
-        </Text>
-        <Text style={styles.quantities}>{quantities}</Text>
-      </View>
-      <Text style={styles.lineNote}>{note}</Text>
-      <View style={styles.bar}>
-        <View
-          style={[
-            styles.barFill,
-            { width: `${receivedRatio(item) * 100}%`, backgroundColor: finished ? colors.MUTED : colors.GREEN_DARK },
-          ]}
-        />
-      </View>
-    </View>
-  );
-}
-
-function Separator() {
-  return <View style={styles.separator} />;
 }
 
 const styles = StyleSheet.create({
@@ -280,67 +170,11 @@ const styles = StyleSheet.create({
   list: {
     padding: 16,
   },
-  listEmpty: {
-    flexGrow: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  separator: {
-    height: 10,
-  },
-  line: {
-    backgroundColor: colors.WHITE,
-    borderWidth: 1,
-    borderColor: colors.OPTION_BORDER,
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-  },
-  lineTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "baseline",
-    gap: 10,
-  },
-  designation: {
-    flex: 1,
-    color: colors.DARK,
-    fontSize: 14,
-    fontFamily: "SemiBold",
-  },
-  quantities: {
-    color: colors.DARK,
-    fontSize: 13,
-    fontFamily: "SemiBold",
-  },
-  lineNote: {
-    marginTop: 3,
-    color: colors.MUTED,
-    fontSize: 12,
-    fontFamily: "Montserrat",
-  },
-  bar: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.PROGRESS_TRACK,
-    marginTop: 10,
-    overflow: "hidden",
-  },
-  barFill: {
-    height: 6,
-    borderRadius: 3,
-  },
   footer: {
     paddingVertical: 14,
     paddingHorizontal: 16,
     backgroundColor: colors.WHITE,
     borderTopWidth: 1,
     borderTopColor: colors.TAB_BAR_BORDER,
-  },
-  note: {
-    color: colors.TEXT_SECONDARY,
-    fontSize: 14,
-    fontFamily: "Medium",
-    textAlign: "center",
   },
 });

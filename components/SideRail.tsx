@@ -7,7 +7,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
 import type { BottomTabBarProps } from "expo-router/tabs";
@@ -19,6 +18,7 @@ import { colors } from "../constants/colors";
 import { isTablet } from "../constants/layout";
 import { useAccount } from "../context/AccountContext";
 import { useScanCamera } from "../context/ScanCameraContext";
+import { useIsLandscape } from "../hooks/useIsLandscape";
 import { useLogout } from "../hooks/useLogout";
 import { Account } from "../model/Account";
 import { accountInitials } from "../services/AccountInitials";
@@ -51,8 +51,7 @@ export default function SideRail({ state, navigation, entries, icons }: SideRail
   const handleLogout = useLogout();
   const insets = useSafeAreaInsets();
   const leftInset = useScreenLeftInset();
-  const { width, height } = useWindowDimensions();
-  const metrics = width > height ? LANDSCAPE : PORTRAIT;
+  const metrics = useIsLandscape() ? LANDSCAPE : PORTRAIT;
   const [isAccountListOpen, setAccountListOpen] = useState(false);
   const paddingBottom = metrics.paddingBottom + insets.bottom;
 
