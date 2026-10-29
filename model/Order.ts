@@ -35,3 +35,23 @@ export interface OrderResponse {
   total: number;
   filteredCount?: number;
 }
+
+export interface OrderItem {
+  orderItemId: number;
+  itemProductId: number;
+  itemProviderId: number;
+  itemDesignation: string;
+  itemGtin?: string;
+  itemType?: string;
+  itemProviderName?: string;
+  itemQuantity: number;
+  itemPrice?: number;
+  itemTotal?: number;
+  itemDeliveredQuantity: number;
+  receivers?: string[];
+}
+
+export interface OrderItemResponse {
+  content: OrderItem[];
+  total: number;
+}

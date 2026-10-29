@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import { useNavigation } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
 
 import Header from "../../../components/Header";
+import { LoadFailed, Loading, styles as loadStyles } from "../../../components/LoadState";
 import OrderCard from "../../../components/OrderCard";
 import { useScreenLeftInset } from "../../../components/SideRail";
 import { useScreenBottomInset } from "../../../components/TabBar";
@@ -23,6 +24,7 @@ export default function Orders() {
   const bottomInset = useScreenBottomInset();
   const leftInset = useScreenLeftInset();
   const navigation = useNavigation();
+  const router = useRouter();
   const { activeAccount } = useAccount();
   const accountId = activeAccount?.id;
   const [filter, setFilter] = useState<OrderListFilter>("toReceive");
@@ -64,29 +66,23 @@ export default function Orders() {
 
   let body;
   if (failed && !orders) {
-    body = (
-      <View style={styles.center}>
-        <Text style={styles.message}>Impossible de charger les commandes</Text>
-        <Pressable style={styles.retry} onPress={retry} accessibilityRole="button">
-          <Text style={styles.retryText}>Réessayer</Text>
-        </Pressable>
-      </View>
-    );
+    body = <LoadFailed message="Impossible de charger les commandes" onRetry={retry} />;
   } else if (!orders) {
-    body = (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.GREEN_DARK} accessibilityLabel="Chargement des commandes" />
-      </View>
-    );
+    body = <Loading label="Chargement des commandes" />;
   } else {
     body = (
       <FlatList
         data={orders}
         keyExtractor={(order) => String(order.orderId)}
-        renderItem={({ item }) => <OrderCard order={item} />}
+        renderItem={({ item }) => (
+          <OrderCard
+            order={item}
+            onPress={() => router.push({ pathname: "/orders/[orderId]", params: { orderId: String(item.orderId) } })}
+          />
+        )}
         contentContainerStyle={[styles.list, tablet && styles.listTablet, orders.length === 0 && styles.listEmpty]}
         ItemSeparatorComponent={Separator}
-        ListEmptyComponent={<Text style={styles.message}>{EMPTY_MESSAGES[filter]}</Text>}
+        ListEmptyComponent={<Text style={loadStyles.message}>{EMPTY_MESSAGES[filter]}</Text>}
         ListFooterComponent={
           filter === "all" && loadingMore ? <ActivityIndicator style={styles.footer} color={colors.GREEN_DARK} /> : null
         }
@@ -208,30 +204,5 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingVertical: 16,
-  },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    gap: 16,
-  },
-  message: {
-    color: colors.MUTED,
-    fontSize: 15,
-    fontFamily: "Montserrat",
-    textAlign: "center",
-  },
-  retry: {
-    height: 44,
-    borderRadius: 22,
-    paddingHorizontal: 20,
-    backgroundColor: colors.GREEN_DARK,
-    justifyContent: "center",
-  },
-  retryText: {
-    color: colors.WHITE,
-    fontSize: 14,
-    fontFamily: "SemiBold",
   },
 });

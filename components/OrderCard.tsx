@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors } from "@/constants/colors";
 import type { Order, OrderStatus } from "@/model/Order";
@@ -18,33 +18,48 @@ const STATUS_COLORS: Record<OrderStatus, { background: string; text: string }> =
   closed: { background: colors.BORDER, text: colors.MUTED },
 };
 
-function formatPrice(price: number | undefined): string | null {
+export function formatPrice(price: number | undefined): string | null {
   if (price === undefined) {
     return null;
   }
   return price.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 }
 
-export default function OrderCard({ order }: { order: Order }) {
-  const date = formatOrderDate(order.orderDate);
-  const status = order.orderStatusLabel ?? STATUS_LABELS[order.orderStatus];
+function orderStatusLabel(order: Order): string {
+  return order.orderStatusLabel ?? STATUS_LABELS[order.orderStatus];
+}
+
+export function providerNames(order: Order): string {
+  return (order.providers ?? []).map((provider) => provider.name).join(", ");
+}
+
+export function OrderStatusPill({ order }: { order: Order }) {
   const statusColors = STATUS_COLORS[order.orderStatus];
-  const providers = (order.providers ?? []).map((provider) => provider.name).join(", ");
+  return (
+    <View style={[styles.status, { backgroundColor: statusColors.background }]}>
+      <Text style={[styles.statusText, { color: statusColors.text }]}>{orderStatusLabel(order)}</Text>
+    </View>
+  );
+}
+
+export default function OrderCard({ order, onPress }: { order: Order; onPress: () => void }) {
+  const date = formatOrderDate(order.orderDate);
+  const status = orderStatusLabel(order);
+  const providers = providerNames(order);
   const meta = [formatPrice(order.orderPrice), order.user ? `passée par ${order.user}` : null]
     .filter(Boolean)
     .join(" · ");
 
   return (
-    <View
-      style={styles.card}
-      accessible={true}
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      onPress={onPress}
+      accessibilityRole="button"
       accessibilityLabel={[`Commande du ${date}`, status, providers, meta].filter(Boolean).join(", ")}
     >
       <View style={styles.top}>
         <Text style={styles.date}>Commande du {date}</Text>
-        <View style={[styles.status, { backgroundColor: statusColors.background }]}>
-          <Text style={[styles.statusText, { color: statusColors.text }]}>{status}</Text>
-        </View>
+        <OrderStatusPill order={order} />
       </View>
       {providers ? (
         <Text style={styles.providers} numberOfLines={1} ellipsizeMode="tail">
@@ -52,7 +67,7 @@ export default function OrderCard({ order }: { order: Order }) {
         </Text>
       ) : null}
       {meta ? <Text style={styles.meta}>{meta}</Text> : null}
-    </View>
+    </Pressable>
   );
 }
 
@@ -64,6 +79,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 16,
+  },
+  cardPressed: {
+    backgroundColor: colors.OPTION_SELECTED_BG,
   },
   top: {
     flexDirection: "row",

@@ -1,4 +1,5 @@
-import type { Order, OrderFilter, OrderResponse } from "../model/Order";
+import type { AxiosResponse } from "axios";
+import type { Order, OrderFilter, OrderItem, OrderItemResponse, OrderResponse } from "../model/Order";
 import apiClient from "./ApiService";
 
 const ORDER_PAGE_SIZE = 20;
@@ -20,17 +21,20 @@ export function appendOrders(loaded: readonly Order[], incoming: readonly Order[
 export class AccountChangedError extends Error {}
 
 // The Account-Id header is read when the request leaves, after the token wait: an account switch can slip in between.
+function sentUnder<T>(accountId: string, response: AxiosResponse<T>): T | null {
+  if (String(response.config.headers?.["Account-Id"]) !== String(accountId)) {
+    throw new AccountChangedError();
+  }
+  return response.status === 204 ? null : response.data;
+}
+
 async function fetchPage(accountId: string, offset: number, status?: string): Promise<OrderResponse | null> {
   const params: Record<string, string | number> = { "page.size": ORDER_PAGE_SIZE, "page.offset": offset };
   if (status) {
     params.filters = "orderStatus";
     params.filterValues = status;
   }
-  const response = await apiClient.get<OrderResponse>("/order", { params });
-  if (String(response.config.headers?.["Account-Id"]) !== String(accountId)) {
-    throw new AccountChangedError();
-  }
-  return response.status === 204 ? null : response.data;
+  return sentUnder(accountId, await apiClient.get<OrderResponse>("/order", { params }));
 }
 
 type StatusList = { orders: Order[]; filters?: OrderFilter[] };
@@ -84,6 +88,11 @@ class OrderService {
       orders: appendOrders(pending.orders, partial.orders).sort(newestFirst),
       count: countToReceive(pending.filters ?? partial.filters),
     };
+  }
+
+  async getOrderItems(accountId: string, orderId: number): Promise<OrderItem[]> {
+    const response = sentUnder(accountId, await apiClient.get<OrderItemResponse>(`/order/${orderId}`));
+    return response?.content ?? [];
   }
 }
 

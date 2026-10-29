@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Order, OrderResponse } from "../../model/Order";
+import type { Order, OrderItem, OrderResponse } from "../../model/Order";
 import apiClient from "../ApiService";
 import OrderService, { AccountChangedError } from "../OrderService";
 
@@ -19,6 +19,10 @@ function order(orderId: number, orderDate: string): Order {
 
 function ordersFrom(firstId: number, count: number): Order[] {
   return Array.from({ length: count }, (_, i) => order(firstId + i, `2026-09-${String(28 - i).padStart(2, "0")} 08:00:00+00:00`));
+}
+
+function item(orderItemId: number, itemDeliveredQuantity: number, itemQuantity: number): OrderItem {
+  return { orderItemId, itemProductId: 500, itemProviderId: 3, itemDesignation: "Gants nitrile M", itemQuantity, itemDeliveredQuantity };
 }
 
 const ACCOUNT = "12";
@@ -175,5 +179,29 @@ describe("OrderService", () => {
     mockedApi.get.mockResolvedValueOnce(ok(ordersFrom(100, 3), 3, { headers: { "Account-Id": "34" } }));
 
     await expect(OrderService.getOrdersPage(ACCOUNT, 0)).rejects.toThrow(AccountChangedError);
+  });
+
+  it("loads the lines of an order (catches: lines read from another field than content)", async () => {
+    const lines = [item(7, 0, 6), item(8, 20, 20)];
+    mockedApi.get.mockResolvedValueOnce({ status: 200, data: { content: lines, total: 2 }, config: SENT_UNDER_ACCOUNT });
+
+    expect(await OrderService.getOrderItems(ACCOUNT, 42)).toEqual(lines);
+    expect(mockedApi.get).toHaveBeenCalledWith("/order/42");
+  });
+
+  it("reads a 204 as no line (catches: the empty body read as lines)", async () => {
+    mockedApi.get.mockResolvedValueOnce(NO_CONTENT);
+
+    expect(await OrderService.getOrderItems(ACCOUNT, 42)).toEqual([]);
+  });
+
+  it("refuses lines sent under another account than the one asked for (catches: no account check on the detail)", async () => {
+    mockedApi.get.mockResolvedValueOnce({
+      status: 200,
+      data: { content: [item(7, 0, 6)], total: 1 },
+      config: { headers: { "Account-Id": "34" } },
+    });
+
+    await expect(OrderService.getOrderItems(ACCOUNT, 42)).rejects.toThrow(AccountChangedError);
   });
 });
