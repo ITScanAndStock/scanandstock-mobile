@@ -61,7 +61,8 @@ export default function TabBar({ state, navigation, insets, entries, icons }: Ta
           return null;
         }
         const { isFocused, onPress } = target;
-        const tint = isFocused ? colors.GREEN_DARK : colors.MUTED;
+        const iconTint = isFocused ? colors.GREEN : colors.MUTED;
+        const labelTint = isFocused ? colors.GREEN_DARK : colors.MUTED;
         const Icon = icons[entry.icon];
 
         return (
@@ -73,8 +74,8 @@ export default function TabBar({ state, navigation, insets, entries, icons }: Ta
             accessibilityLabel={entry.label}
             accessibilityState={{ selected: isFocused }}
           >
-            <Icon width={24} height={24} color={tint} accessible={false} />
-            <Text style={[styles.label, { color: tint }]}>{entry.label}</Text>
+            <Icon width={24} height={24} color={iconTint} accessible={false} />
+            <Text style={[styles.label, { color: labelTint }]}>{entry.label}</Text>
           </Pressable>
         );
       })}
