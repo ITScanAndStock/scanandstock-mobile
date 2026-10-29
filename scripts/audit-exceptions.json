@@ -1,0 +1,19 @@
+{
+  "comment": "Read by scripts/audit-check.mjs, keyed by ghsa and package. Each path comes from `npm explain`; the check does not verify it.",
+  "exceptions": [
+    {
+      "ghsa": "GHSA-mrhx-c7xc-m3w5",
+      "package": "zod",
+      "path": "expo > @expo/cli > zod",
+      "severity": "high",
+      "reason": "Build tool: @expo/cli runs on the developer machine and in CI, zod is absent from the iOS and Android bundle source maps (29/10). @expo/cli 57 requires zod ^3.25.76; the fix (4.6.6) needs another Expo SDK."
+    },
+    {
+      "ghsa": "GHSA-vcc3-ghjq-m6fr",
+      "package": "decode-uri-component",
+      "path": "expo-router > query-string > decode-uri-component",
+      "severity": "moderate",
+      "reason": "Shipped in the app: it decodes scanandstock:// links and route parameters, so a malformed link can slow the app down (denial of service, no data exposed). expo-router 57 has no fixed version; kept by decision of 2026-10-26 until the move to SDK 58."
+    }
+  ]
+}
