@@ -13,7 +13,14 @@
       "package": "decode-uri-component",
       "path": "expo-router > query-string > decode-uri-component",
       "severity": "moderate",
-      "reason": "Shipped in the app: it decodes scanandstock:// links and route parameters, so a malformed link can slow the app down (denial of service, no data exposed). expo-router 57 has no fixed version; kept by decision of 2026-10-26 until the move to SDK 58."
+      "reason": "Shipped in the app: it decodes scanandstock:// links and route parameters, so a malformed link can slow the app down (denial of service, no data exposed). expo-router 57 has no fixed version; kept by decision of 2026-10-26 until expo-router drops query-string 7 (expo-router 58 still requires ^7.1.3, 30/10)."
+    },
+    {
+      "ghsa": "GHSA-qr28-fpjm-wq7f",
+      "package": "decode-uri-component",
+      "path": "expo-router > query-string > decode-uri-component",
+      "severity": "high",
+      "reason": "Shipped in the app: it decodes scanandstock:// links and route parameters, so a malformed link can slow the app down (denial of service, no data exposed). The fix (0.5.1) is ESM-only: query-string 7 loads it with require and its parse throws 'decodeComponent is not a function' (30/10). Kept by decision of 2026-10-30 until expo-router drops query-string 7 (expo-router 58 still requires ^7.1.3, 30/10), like GHSA-vcc3-ghjq-m6fr."
     }
   ]
 }
