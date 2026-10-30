@@ -55,8 +55,9 @@ function setup() {
   const draft = createReceiptDraft([ITEM]);
   draft.addBatch(7, { quantity: 2, batchNumber: "LT2291", expiration: { day: 31, month: 3, year: 2028 } });
   const refreshMovements = vi.fn();
-  const sender = createReceiptSend({ draft, orderId: ORDER_ID, refreshMovements });
-  return { draft, refreshMovements, sender };
+  const scanSent = vi.fn();
+  const sender = createReceiptSend({ draft, orderId: ORDER_ID, refreshMovements, scanSent });
+  return { draft, refreshMovements, scanSent, sender };
 }
 
 describe("ReceiptSend", () => {
@@ -153,13 +154,28 @@ describe("ReceiptSend", () => {
     });
   });
 
-  it("tells a 417 sent with a badge what movementErrorToast says of a refused badge (catches: another case's message; badge read as not sent)", async () => {
+  it("returns a 417 sent with a badge as a refused badge, with what movementErrorToast says of it (catches: 417 returned as a plain failure, another case's message, badge read as not sent)", async () => {
     mockedApi.post.mockRejectedValueOnce(refusal(417, { "Badge-Id": "BADGE-1" }));
     const { sender } = setup();
 
     const outcome = await sender.send();
 
-    expect(outcome.kind === "failed" && outcome.toast[1]).toBe("Badge refusé");
+    expect(outcome.kind === "badgeRefused" && outcome.toast[1]).toBe("Badge refusé");
+  });
+
+  it("restarts the badge timer when the receipt is posted, not before (catches: scanSent not called, called on a send stopped before the POST)", async () => {
+    const { draft, scanSent, sender } = setup();
+    mockedApi.get.mockResolvedValueOnce(linesServed([{ ...ITEM, itemDeliveredQuantity: 2 }]));
+
+    await sender.send();
+    const afterStoppedSend = scanSent.mock.calls.length;
+    draft.addBatch(7, { quantity: 1, batchNumber: "LT2291", expiration: { day: 31, month: 3, year: 2028 } });
+    mockedApi.get.mockResolvedValueOnce(linesServed([{ ...ITEM, itemDeliveredQuantity: 2 }]));
+    await sender.send();
+
+    expect(afterStoppedSend).toBe(0);
+    expect(scanSent).toHaveBeenCalledTimes(1);
+    expect(mockedApi.post).toHaveBeenCalledTimes(1);
   });
 
   it.each([400, 402, 500])(

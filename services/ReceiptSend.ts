@@ -16,23 +16,30 @@ export type SendOutcome =
   | { kind: "accountChanged" }
   | { kind: "linesChanged"; count: number }
   | { kind: "confirmUncertain" }
+  | { kind: "badgeRefused"; toast: ErrorToastArgs }
   | { kind: "failed"; toast: ErrorToastArgs };
 
 type ReceiptSendOptions = {
   draft: ReceiptDraft;
   orderId: number;
   refreshMovements: () => void;
+  scanSent: () => void;
 };
 
 const RELOAD_FAILED: ErrorToastArgs = ["Impossible de relire la commande avant l'envoi : réessayez.", "Réception non envoyée"];
 
-function refusalToast(error: AxiosErrorType): ErrorToastArgs {
+const NOT_RECORDED: ErrorToastArgs = ["La réception n'a pas pu être enregistrée"];
+
+function refusalOutcome(error: AxiosErrorType): SendOutcome {
   const { response } = error;
   if (!response) {
-    return ["La réception a peut-être été enregistrée : rouvrez la commande pour vérifier.", "Pas de réponse du serveur"];
+    return {
+      kind: "failed",
+      toast: ["La réception a peut-être été enregistrée : rouvrez la commande pour vérifier.", "Pas de réponse du serveur"],
+    };
   }
   if (response.status === 403) {
-    return ["La réception est réservée aux personnes habilitées de votre cabinet"];
+    return { kind: "failed", toast: ["La réception est réservée aux personnes habilitées de votre cabinet"] };
   }
   if (response.status === 417) {
     const toast = movementErrorToast({
@@ -40,14 +47,12 @@ function refusalToast(error: AxiosErrorType): ErrorToastArgs {
       badgeSent: !!error.config?.headers?.["Badge-Id"],
       tracingEnabled: HeaderStore.isTracingEnabled(),
     });
-    if (toast) {
-      return toast;
-    }
+    return { kind: "badgeRefused", toast: toast ?? NOT_RECORDED };
   }
-  return ["La réception n'a pas pu être enregistrée"];
+  return { kind: "failed", toast: NOT_RECORDED };
 }
 
-export function createReceiptSend({ draft, orderId, refreshMovements }: ReceiptSendOptions) {
+export function createReceiptSend({ draft, orderId, refreshMovements, scanSent }: ReceiptSendOptions) {
   const accountId = HeaderStore.getAccountId();
   // Not React state: a second press before the re-render must not send twice.
   let sending = false;
@@ -78,6 +83,7 @@ export function createReceiptSend({ draft, orderId, refreshMovements }: ReceiptS
     }
     // Codes recognised during the POST change the draft, not what was sent.
     const result = receiptResult(draft.lines());
+    scanSent();
     try {
       await OrderService.receiveOrder(accountId, orderId, body);
     } catch (error) {
@@ -85,7 +91,7 @@ export function createReceiptSend({ draft, orderId, refreshMovements }: ReceiptS
       if (!refusal.response) {
         draft.setMarks({ uncertainSend: true });
       }
-      return { kind: "failed", toast: refusalToast(refusal) };
+      return refusalOutcome(refusal);
     }
     draft.setMarks({ uncertainSend: false });
     refreshMovements();

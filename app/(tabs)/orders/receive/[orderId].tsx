@@ -1,5 +1,5 @@
-import { type ReactNode, useCallback, useEffect, useState } from "react";
-import { Alert, BackHandler, FlatList, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { type ReactNode, useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { Alert, BackHandler, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useIsFocused, useLocalSearchParams, useNavigation, useRoute, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -10,13 +10,14 @@ import ReceiptCamera from "../../../../components/ReceiptCamera";
 import ReceiptLineRow, { finishedAtStartCount } from "../../../../components/ReceiptLineRow";
 import ReceiptLineSheet from "../../../../components/ReceiptLineSheet";
 import ReceiptScanCard from "../../../../components/ReceiptScanCard";
+import ScanBadge from "../../../../components/ScanBadge";
 import { colors } from "@/constants/colors";
 import { useAccount } from "@/context/AccountContext";
 import { useScanCamera } from "@/context/ScanCameraContext";
 import { useCanReceive } from "@/hooks/useCanReceive";
 import { useGoToOrderList } from "@/hooks/useGoToOrderList";
 import { useOrderItems } from "@/hooks/useOrderItems";
-import { type ScanSounds, useScanSounds } from "@/hooks/useScanSounds";
+import { scanFeedback, type ScanSounds, useScanSounds } from "@/hooks/useScanSounds";
 import { useStats } from "@/hooks/useStats";
 import type { Order, OrderItem } from "@/model/Order";
 import { formatOrderDate } from "@/services/OrderDate";
@@ -105,16 +106,31 @@ type ReceiptSessionProps = {
   onAccountChanged: () => void;
 };
 
-function createSession(
-  orderId: number,
-  items: readonly OrderItem[],
-  sounds: ScanSounds,
-  onBanner: (banner: ReceiptBanner) => void,
-  onAccountChanged: () => void,
-  refreshMovements: () => void,
-) {
+type SessionOptions = {
+  orderId: number;
+  items: readonly OrderItem[];
+  sounds: ScanSounds;
+  onBanner: (banner: ReceiptBanner) => void;
+  onAccountChanged: () => void;
+  refreshMovements: () => void;
+  isBadgeValid: () => boolean;
+  connectBadge: (code: string) => Promise<boolean>;
+  scanSent: () => void;
+};
+
+function createSession({
+  orderId,
+  items,
+  sounds,
+  onBanner,
+  onAccountChanged,
+  refreshMovements,
+  isBadgeValid,
+  connectBadge,
+  scanSent,
+}: SessionOptions) {
   const draft = createReceiptDraft(items);
-  const sender = createReceiptSend({ draft, orderId, refreshMovements });
+  const sender = createReceiptSend({ draft, orderId, refreshMovements, scanSent });
   const scan = createReceiptScan({
     draft,
     recognize: (code, group, apply) => ReceiptRecognizer.recognize(code, group, apply),
@@ -124,17 +140,20 @@ function createSession(
       if (recognition.kind === "added" && recognition.merged) {
         return;
       }
-      Vibration.vibrate(100);
-      if (recognition.kind === "added") {
-        sounds.success();
-      } else {
-        sounds.error();
-      }
+      scanFeedback(sounds, recognition.kind === "added");
     },
     onAccountChanged,
+    badge: { isValid: isBadgeValid, connect: connectBadge },
+    onBadge: (connected) => scanFeedback(sounds, connected),
   });
   return { draft, scan, sender };
 }
+
+const BADGE_PROMPT: ReceiptBanner = {
+  tone: "error",
+  title: "Scannez votre badge",
+  detail: "Votre cabinet trace les mouvements de stock",
+};
 
 function ReceiptSession({ order, items, onLeave, onAccountChanged }: ReceiptSessionProps) {
   const insets = useSafeAreaInsets();
@@ -143,12 +162,24 @@ function ReceiptSession({ order, items, onLeave, onAccountChanged }: ReceiptSess
   const navigation = useNavigation();
   const sounds = useScanSounds();
   const { refresh: refreshStats } = useStats();
+  const { getBadge, isBadgeValid, scanSent, isTracingEnabled, activeBadgeName } = useAccount();
   const [banner, setBanner] = useState<ReceiptBanner | null>(null);
   const [sending, setSending] = useState(false);
   const [sheetItemId, setSheetItemId] = useState<number | null>(null);
   const [{ draft, scan, sender }] = useState(() =>
-    createSession(order.orderId, items, sounds, setBanner, onAccountChanged, () => void refreshStats()),
+    createSession({
+      orderId: order.orderId,
+      items,
+      sounds,
+      onBanner: setBanner,
+      onAccountChanged,
+      refreshMovements: () => void refreshStats(),
+      isBadgeValid,
+      connectBadge: getBadge,
+      scanSent,
+    }),
   );
+  const phase = useSyncExternalStore(scan.subscribe, scan.phase);
 
   useEffect(() => () => scan.close(), [scan]);
 
@@ -208,8 +239,12 @@ function ReceiptSession({ order, items, onLeave, onAccountChanged }: ReceiptSess
       case "confirmUncertain":
         Alert.alert("Envoi incertain", "Vérifiez que la réception n'est pas déjà passée.", [
           { text: "Annuler", style: "cancel" },
-          { text: "Envoyer quand même", onPress: () => void send(true) },
+          { text: "Envoyer quand même", onPress: () => requestSend(true) },
         ]);
+        return;
+      case "badgeRefused":
+        ToastService.error(...outcome.toast);
+        scan.badgeRefused();
         return;
       case "failed":
         ToastService.error(...outcome.toast);
@@ -226,6 +261,8 @@ function ReceiptSession({ order, items, onLeave, onAccountChanged }: ReceiptSess
     setSending(false);
     showOutcome(outcome);
   };
+
+  const requestSend = (confirmedUncertain: boolean) => scan.requestSend(() => void send(confirmedUncertain));
 
   const lines = draft.lines();
   const scanned = draft.count();
@@ -247,7 +284,7 @@ function ReceiptSession({ order, items, onLeave, onAccountChanged }: ReceiptSess
       camera={
         cameraTurn.receipt && isFocused ? <ReceiptCamera onScanned={({ data }) => !sender.isSending() && scan.frame(data, Date.now())} /> : null
       }
-      banner={banner}
+      banner={phase === "badge" ? BADGE_PROMPT : banner}
       overlay={
         sheetLine ? (
           <ReceiptLineSheet
@@ -261,7 +298,9 @@ function ReceiptSession({ order, items, onLeave, onAccountChanged }: ReceiptSess
       header={
         <>
           <Text style={styles.sheetTitle}>{plural(scanned, "produit scanné", "produits scannés")}</Text>
-          {finished > 0 ? (
+          {phase === "products" && isTracingEnabled === true && !activeBadgeName ? (
+            <Text style={styles.badgeNote}>Badge à rescanner avant l&apos;envoi</Text>
+          ) : finished > 0 ? (
             <Text style={styles.sheetNote}>{plural(finished, "ligne déjà terminée", "lignes déjà terminées")}</Text>
           ) : null}
         </>
@@ -278,8 +317,8 @@ function ReceiptSession({ order, items, onLeave, onAccountChanged }: ReceiptSess
       <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
         <PrimaryButton
           label={sending ? "Envoi en cours…" : `Réceptionner ${plural(scanned, "produit")}`}
-          onPress={() => void send(false)}
-          disabled={scanned === 0 || sending}
+          onPress={() => requestSend(false)}
+          disabled={scanned === 0 || sending || phase === "badge"}
           busy={sending}
         />
       </View>
@@ -311,6 +350,9 @@ function ReceiptLayout({ order, onLeave, camera, banner, overlay, header, childr
               Réception · commande du {formatOrderDate(order.orderDate)}
             </Text>
           </View>
+        </View>
+        <View style={styles.badgeRow} pointerEvents="box-none">
+          <ScanBadge tone="overlay" />
         </View>
         {banner ? <ReceiptScanCard banner={banner} style={styles.banner} /> : null}
       </View>
@@ -359,6 +401,17 @@ const styles = StyleSheet.create({
   titleText: {
     color: colors.WHITE,
     fontSize: 14,
+    fontFamily: "SemiBold",
+  },
+  badgeRow: {
+    position: "absolute",
+    top: 60,
+    left: 16,
+    flexDirection: "row",
+  },
+  badgeNote: {
+    color: colors.DECREASE_TEXT,
+    fontSize: 12,
     fontFamily: "SemiBold",
   },
   banner: {
