@@ -122,6 +122,64 @@ describe("ReceiptScan", () => {
     expect(onAccountChanged).toHaveBeenCalledTimes(1);
   });
 
+  it("counts no code shown while the line sheet is open (catches: frames passed to the gate with the sheet open)", () => {
+    const { recognize, receipt } = setup();
+
+    expect(receipt.openSheet(clock)).toBe(true);
+    show(receipt, GTIN);
+
+    expect(recognize).not.toHaveBeenCalled();
+  });
+
+  it("does not open the sheet while a recognition is in flight (catches: sheet opened during a recognition)", async () => {
+    const { draft, answers, receipt } = setup();
+
+    show(receipt, GTIN);
+    const opened = receipt.openSheet(clock);
+    answers[0].resolve();
+    await flush();
+
+    expect(opened).toBe(false);
+    expect(draft.count()).toBe(1);
+    expect(receipt.openSheet(clock)).toBe(true);
+  });
+
+  it("does not open a second sheet over an open one (catches: sheet opened while one is open)", () => {
+    const { receipt } = setup();
+
+    receipt.openSheet(clock);
+
+    expect(receipt.openSheet(clock)).toBe(false);
+  });
+
+  it("does not count again the box still in view when the sheet closes (catches: cameraClosed or cameraReopened not called)", async () => {
+    const { answers, recognize, receipt } = setup();
+
+    show(receipt, GTIN);
+    answers[0].resolve();
+    await flush();
+    receipt.openSheet((clock += 200));
+    clock += 10000;
+    receipt.closeSheet();
+    show(receipt, GTIN);
+
+    expect(recognize).toHaveBeenCalledTimes(1);
+  });
+
+  it("counts again a box that had left before the sheet opened (catches: cameraClosed not called)", async () => {
+    const { answers, recognize, receipt } = setup();
+
+    show(receipt, GTIN);
+    answers[0].resolve();
+    await flush();
+    receipt.openSheet((clock += 3000));
+    clock += 2000;
+    receipt.closeSheet();
+    show(receipt, GTIN);
+
+    expect(recognize).toHaveBeenCalledTimes(2);
+  });
+
   it("takes a code still held by the previous receipt in the next one (catches: one gate shared by every receipt)", () => {
     const first = setup();
     show(first.receipt, GTIN);

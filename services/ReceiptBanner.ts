@@ -4,6 +4,8 @@ import type { Recognition } from "./ReceiptRecognizer";
 export type ReceiptBanner = { tone: "success" | "error"; title: string; detail?: string };
 
 // /product/decode writes dd-MM-yyyy; a box prints its expiration as a month.
+export const fullExpiration = (expirationDate: string) => expirationDate.split("-").join("/");
+
 export function expirationMonth(expirationDate: string) {
   const parts = /^\d{2}-(\d{2})-(\d{4})$/.exec(expirationDate);
   return parts ? `${parts[1]}/${parts[2]}` : expirationDate;

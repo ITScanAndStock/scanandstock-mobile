@@ -15,6 +15,7 @@ export function createReceiptScan({ draft, recognize, onRecognized, onAccountCha
   const accountId = HeaderStore.getAccountId();
   // Bumped when the receipt closes, so an answer to a code sent before changes and shows nothing.
   let generation = 0;
+  let sheetOpen = false;
 
   const recognizeSent = async (code: string, group: number) => {
     const run = generation;
@@ -30,6 +31,10 @@ export function createReceiptScan({ draft, recognize, onRecognized, onAccountCha
 
   return {
     frame: (raw: string, now: number) => {
+      // The gate's frame() does not read cameraClosed: under the sheet, a code would change the draft being edited.
+      if (sheetOpen) {
+        return;
+      }
       const decision = gate.frame(raw, now);
       if (decision.kind !== "send") {
         return;
@@ -40,6 +45,18 @@ export function createReceiptScan({ draft, recognize, onRecognized, onAccountCha
         return;
       }
       void recognizeSent(decision.code, decision.group);
+    },
+    openSheet: (now: number) => {
+      if (sheetOpen || gate.isBusy()) {
+        return false;
+      }
+      sheetOpen = true;
+      gate.cameraClosed(now);
+      return true;
+    },
+    closeSheet: () => {
+      sheetOpen = false;
+      gate.cameraReopened();
     },
     close: () => {
       generation += 1;

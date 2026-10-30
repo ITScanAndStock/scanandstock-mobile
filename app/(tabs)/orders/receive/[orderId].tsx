@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useState } from "react";
-import { Alert, FlatList, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Alert, BackHandler, FlatList, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { useFocusEffect, useIsFocused, useLocalSearchParams, useNavigation, useRoute, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -8,6 +8,7 @@ import { LoadFailed, Loading } from "../../../../components/LoadState";
 import PrimaryButton from "../../../../components/PrimaryButton";
 import ReceiptCamera from "../../../../components/ReceiptCamera";
 import ReceiptLineRow, { finishedAtStartCount } from "../../../../components/ReceiptLineRow";
+import ReceiptLineSheet from "../../../../components/ReceiptLineSheet";
 import ReceiptScanCard from "../../../../components/ReceiptScanCard";
 import { colors } from "@/constants/colors";
 import { useAccount } from "@/context/AccountContext";
@@ -21,7 +22,8 @@ import type { Order, OrderItem } from "@/model/Order";
 import { formatOrderDate } from "@/services/OrderDate";
 import { plural } from "@/services/Plural";
 import { type ReceiptBanner, receiptBanner } from "@/services/ReceiptBanner";
-import { createReceiptDraft } from "@/services/ReceiptDraft";
+import { createReceiptDraft, type DraftLine } from "@/services/ReceiptDraft";
+import { type LineForm, saveLineForm } from "@/services/ReceiptLineEdit";
 import ReceiptRecognizer from "@/services/ReceiptRecognizer";
 import { createReceiptScan } from "@/services/ReceiptScan";
 import { createReceiptSend, type SendOutcome } from "@/services/ReceiptSend";
@@ -143,11 +145,39 @@ function ReceiptSession({ order, items, onLeave, onAccountChanged }: ReceiptSess
   const { refresh: refreshStats } = useStats();
   const [banner, setBanner] = useState<ReceiptBanner | null>(null);
   const [sending, setSending] = useState(false);
+  const [sheetItemId, setSheetItemId] = useState<number | null>(null);
   const [{ draft, scan, sender }] = useState(() =>
     createSession(order.orderId, items, sounds, setBanner, onAccountChanged, () => void refreshStats()),
   );
 
   useEffect(() => () => scan.close(), [scan]);
+
+  const closeSheet = useCallback(() => {
+    scan.closeSheet();
+    setSheetItemId(null);
+  }, [scan]);
+
+  useEffect(() => {
+    if (sheetItemId === null) {
+      return;
+    }
+    // Registered after the navigator's handler, so Back closes the sheet before leaving the receipt.
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      closeSheet();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [sheetItemId, closeSheet]);
+
+  const openSheet = useCallback(
+    (orderItemId: number) => {
+      // Not while a code is being recognized: its answer would change the line under the sheet.
+      if (scan.openSheet(Date.now())) {
+        setSheetItemId(orderItemId);
+      }
+    },
+    [scan],
+  );
 
   const showOutcome = (outcome: SendOutcome) => {
     switch (outcome.kind) {
@@ -200,6 +230,15 @@ function ReceiptSession({ order, items, onLeave, onAccountChanged }: ReceiptSess
   const lines = draft.lines();
   const scanned = draft.count();
   const finished = finishedAtStartCount(lines);
+  const sheetLine = lines.find((line) => line.item.orderItemId === sheetItemId);
+
+  const saveSheet = (line: DraftLine, form: LineForm) => {
+    const saved = saveLineForm(draft, line, form);
+    if (saved.kind === "saved") {
+      closeSheet();
+    }
+    return saved;
+  };
 
   return (
     <ReceiptLayout
@@ -209,6 +248,16 @@ function ReceiptSession({ order, items, onLeave, onAccountChanged }: ReceiptSess
         cameraTurn.receipt && isFocused ? <ReceiptCamera onScanned={({ data }) => !sender.isSending() && scan.frame(data, Date.now())} /> : null
       }
       banner={banner}
+      overlay={
+        sheetLine ? (
+          <ReceiptLineSheet
+            key={sheetLine.item.orderItemId}
+            line={sheetLine}
+            onSave={(form) => saveSheet(sheetLine, form)}
+            onCancel={closeSheet}
+          />
+        ) : null
+      }
       header={
         <>
           <Text style={styles.sheetTitle}>{plural(scanned, "produit scanné", "produits scannés")}</Text>
@@ -221,7 +270,9 @@ function ReceiptSession({ order, items, onLeave, onAccountChanged }: ReceiptSess
       <FlatList
         data={lines}
         keyExtractor={(line) => String(line.item.orderItemId)}
-        renderItem={({ item }) => <ReceiptLineRow line={item} />}
+        renderItem={({ item }) => (
+          <ReceiptLineRow line={item} onPress={() => openSheet(item.item.orderItemId)} disabled={sending} />
+        )}
         contentContainerStyle={styles.lines}
       />
       <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
@@ -241,11 +292,12 @@ type ReceiptLayoutProps = {
   onLeave: () => void;
   camera?: ReactNode;
   banner?: ReceiptBanner | null;
+  overlay?: ReactNode;
   header: ReactNode;
   children: ReactNode;
 };
 
-function ReceiptLayout({ order, onLeave, camera, banner, header, children }: ReceiptLayoutProps) {
+function ReceiptLayout({ order, onLeave, camera, banner, overlay, header, children }: ReceiptLayoutProps) {
   return (
     <View style={styles.container}>
       <View style={styles.cameraArea}>
@@ -266,6 +318,7 @@ function ReceiptLayout({ order, onLeave, camera, banner, header, children }: Rec
         <View style={styles.sheetHeader}>{header}</View>
         {children}
       </View>
+      {overlay}
     </View>
   );
 }

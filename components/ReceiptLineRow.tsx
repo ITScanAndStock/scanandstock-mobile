@@ -1,8 +1,14 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors } from "../constants/colors";
 import { expirationMonth } from "../services/ReceiptBanner";
 import { type DraftLine, draftQuantity } from "../services/ReceiptDraft";
+
+const COUNT_TONES = {
+  over: { background: colors.STATUS_PARTIAL_BG, text: colors.WITHDRAW },
+  scanned: { background: colors.INCREASE_BG, text: colors.INCREASE_TEXT },
+  idle: { background: colors.BORDER, text: colors.MUTED },
+};
 
 const isFinishedAtStart = (line: DraftLine) => line.deliveredAtStart >= line.item.itemQuantity;
 
@@ -23,16 +29,22 @@ function batchesSummary(line: DraftLine) {
     .join(", ");
 }
 
-export default function ReceiptLineRow({ line }: { line: DraftLine }) {
+type ReceiptLineRowProps = { line: DraftLine; onPress: () => void; disabled: boolean };
+
+export default function ReceiptLineRow({ line, onPress, disabled }: ReceiptLineRowProps) {
   const scanned = draftQuantity(line);
   const received = line.deliveredAtStart + scanned;
+  const tone = received > line.item.itemQuantity ? "over" : scanned > 0 ? "scanned" : "idle";
   const summary = batchesSummary(line);
 
   return (
-    <View
+    <Pressable
       style={[styles.line, scanned > 0 && styles.lineScanned]}
-      accessible={true}
-      accessibilityLabel={`${line.item.itemDesignation}, reçu ${received} sur ${line.item.itemQuantity}, ${summary}`}
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityHint="Corriger la ligne"
+      accessibilityLabel={`${line.item.itemDesignation}, reçu ${received} sur ${line.item.itemQuantity}${tone === "over" ? ", au-delà du commandé" : ""}, ${summary}`}
     >
       <View style={styles.text}>
         <Text style={receiptTextStyles.designation} numberOfLines={1}>
@@ -42,12 +54,12 @@ export default function ReceiptLineRow({ line }: { line: DraftLine }) {
           {summary}
         </Text>
       </View>
-      <View style={[styles.count, scanned > 0 ? styles.countScanned : styles.countIdle]}>
-        <Text style={[styles.countText, { color: scanned > 0 ? colors.INCREASE_TEXT : colors.MUTED }]}>
+      <View style={[styles.count, { backgroundColor: COUNT_TONES[tone].background }]}>
+        <Text style={[styles.countText, { color: COUNT_TONES[tone].text }]}>
           {received} / {line.item.itemQuantity}
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -88,12 +100,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     alignItems: "center",
     justifyContent: "center",
-  },
-  countScanned: {
-    backgroundColor: colors.INCREASE_BG,
-  },
-  countIdle: {
-    backgroundColor: colors.BORDER,
   },
   countText: {
     fontSize: 14,
