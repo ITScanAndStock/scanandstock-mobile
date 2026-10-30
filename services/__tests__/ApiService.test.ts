@@ -78,6 +78,14 @@ describe("ApiService request interceptor", () => {
     expect(sent[0].get("Badge-Id")).toBe("BADGE-7");
   });
 
+  it("keeps the account a request was sent for, even after a switch (catches: Account-Id overwritten by the active account)", async () => {
+    HeaderStore.setAccountId("34");
+
+    await apiClient.post("/order/42/receive", {}, { headers: { "Account-Id": "12" } });
+
+    expect(sent[0].get("Account-Id")).toBe("12");
+  });
+
   it("sends no badge when tracing is off (catches: tracing condition removed)", async () => {
     HeaderStore.setAccountId("42");
     HeaderStore.setTracingEnabled(false);

@@ -1,10 +1,11 @@
 import { type ReactNode, useCallback, useEffect, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Alert, FlatList, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { useFocusEffect, useIsFocused, useLocalSearchParams, useNavigation, useRoute, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import CloseIcon from "../../../../assets/images/figma/close.svg";
 import { LoadFailed, Loading } from "../../../../components/LoadState";
+import PrimaryButton from "../../../../components/PrimaryButton";
 import ReceiptCamera from "../../../../components/ReceiptCamera";
 import ReceiptLineRow, { finishedAtStartCount } from "../../../../components/ReceiptLineRow";
 import ReceiptScanCard from "../../../../components/ReceiptScanCard";
@@ -15,12 +16,16 @@ import { useCanReceive } from "@/hooks/useCanReceive";
 import { useGoToOrderList } from "@/hooks/useGoToOrderList";
 import { useOrderItems } from "@/hooks/useOrderItems";
 import { type ScanSounds, useScanSounds } from "@/hooks/useScanSounds";
+import { useStats } from "@/hooks/useStats";
 import type { Order, OrderItem } from "@/model/Order";
 import { formatOrderDate } from "@/services/OrderDate";
+import { plural } from "@/services/Plural";
 import { type ReceiptBanner, receiptBanner } from "@/services/ReceiptBanner";
 import { createReceiptDraft } from "@/services/ReceiptDraft";
 import ReceiptRecognizer from "@/services/ReceiptRecognizer";
 import { createReceiptScan } from "@/services/ReceiptScan";
+import { createReceiptSend, type SendOutcome } from "@/services/ReceiptSend";
+import ToastService from "@/services/ToastService";
 import OrderCache from "@/state/OrderCache";
 
 export default function OrderReceipt() {
@@ -99,12 +104,15 @@ type ReceiptSessionProps = {
 };
 
 function createSession(
+  orderId: number,
   items: readonly OrderItem[],
   sounds: ScanSounds,
   onBanner: (banner: ReceiptBanner) => void,
   onAccountChanged: () => void,
+  refreshMovements: () => void,
 ) {
   const draft = createReceiptDraft(items);
+  const sender = createReceiptSend({ draft, orderId, refreshMovements });
   const scan = createReceiptScan({
     draft,
     recognize: (code, group, apply) => ReceiptRecognizer.recognize(code, group, apply),
@@ -123,18 +131,71 @@ function createSession(
     },
     onAccountChanged,
   });
-  return { draft, scan };
+  return { draft, scan, sender };
 }
 
 function ReceiptSession({ order, items, onLeave, onAccountChanged }: ReceiptSessionProps) {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const { cameraTurn } = useScanCamera();
+  const navigation = useNavigation();
   const sounds = useScanSounds();
+  const { refresh: refreshStats } = useStats();
   const [banner, setBanner] = useState<ReceiptBanner | null>(null);
-  const [{ draft, scan }] = useState(() => createSession(items, sounds, setBanner, onAccountChanged));
+  const [sending, setSending] = useState(false);
+  const [{ draft, scan, sender }] = useState(() =>
+    createSession(order.orderId, items, sounds, setBanner, onAccountChanged, () => void refreshStats()),
+  );
 
   useEffect(() => () => scan.close(), [scan]);
+
+  const showOutcome = (outcome: SendOutcome) => {
+    switch (outcome.kind) {
+      case "sent":
+        // A logout during the send unmounts the stack: nothing to show then.
+        if (navigation.isFocused()) {
+          // New routes without keys: the list beneath the confirmation is remounted, hence reloaded.
+          navigation.dispatch({
+            type: "RESET",
+            payload: {
+              index: 1,
+              routes: [{ name: "index" }, { name: "received/[orderId]", params: { orderId: String(order.orderId) } }],
+            },
+          });
+        }
+        return;
+      case "accountChanged":
+        onAccountChanged();
+        return;
+      case "linesChanged":
+        ToastService.info(
+          outcome.count > 1
+            ? `${outcome.count} lignes ont été reçues entre-temps : leurs scans ont été retirés`
+            : "1 ligne a été reçue entre-temps : ses scans ont été retirés",
+          "Commande modifiée",
+        );
+        return;
+      case "confirmUncertain":
+        Alert.alert("Envoi incertain", "Vérifiez que la réception n'est pas déjà passée.", [
+          { text: "Annuler", style: "cancel" },
+          { text: "Envoyer quand même", onPress: () => void send(true) },
+        ]);
+        return;
+      case "failed":
+        ToastService.error(...outcome.toast);
+        return;
+      case "busy":
+      case "empty":
+        return;
+    }
+  };
+
+  const send = async (confirmedUncertain: boolean) => {
+    setSending(true);
+    const outcome = await sender.send(confirmedUncertain);
+    setSending(false);
+    showOutcome(outcome);
+  };
 
   const lines = draft.lines();
   const scanned = draft.count();
@@ -145,18 +206,14 @@ function ReceiptSession({ order, items, onLeave, onAccountChanged }: ReceiptSess
       order={order}
       onLeave={onLeave}
       camera={
-        cameraTurn.receipt && isFocused ? <ReceiptCamera onScanned={({ data }) => scan.frame(data, Date.now())} /> : null
+        cameraTurn.receipt && isFocused ? <ReceiptCamera onScanned={({ data }) => !sender.isSending() && scan.frame(data, Date.now())} /> : null
       }
       banner={banner}
       header={
         <>
-          <Text style={styles.sheetTitle}>
-            {scanned} {scanned > 1 ? "produits scannés" : "produit scanné"}
-          </Text>
+          <Text style={styles.sheetTitle}>{plural(scanned, "produit scanné", "produits scannés")}</Text>
           {finished > 0 ? (
-            <Text style={styles.sheetNote}>
-              {finished} {finished > 1 ? "lignes déjà terminées" : "ligne déjà terminée"}
-            </Text>
+            <Text style={styles.sheetNote}>{plural(finished, "ligne déjà terminée", "lignes déjà terminées")}</Text>
           ) : null}
         </>
       }
@@ -165,8 +222,16 @@ function ReceiptSession({ order, items, onLeave, onAccountChanged }: ReceiptSess
         data={lines}
         keyExtractor={(line) => String(line.item.orderItemId)}
         renderItem={({ item }) => <ReceiptLineRow line={item} />}
-        contentContainerStyle={{ paddingBottom: 16 + insets.bottom }}
+        contentContainerStyle={styles.lines}
       />
+      <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
+        <PrimaryButton
+          label={sending ? "Envoi en cours…" : `Réceptionner ${plural(scanned, "produit")}`}
+          onPress={() => void send(false)}
+          disabled={scanned === 0 || sending}
+          busy={sending}
+        />
+      </View>
     </ReceiptLayout>
   );
 }
@@ -268,6 +333,12 @@ const styles = StyleSheet.create({
     color: colors.DARK,
     fontSize: 16,
     fontFamily: "SemiBold",
+  },
+  lines: {
+    paddingBottom: 8,
+  },
+  footer: {
+    paddingTop: 10,
   },
   sheetNote: {
     color: colors.MUTED,

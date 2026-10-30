@@ -6,11 +6,13 @@ import OrderService, { AccountChangedError } from "../OrderService";
 vi.mock("../ApiService", () => ({
   default: {
     get: vi.fn(),
+    post: vi.fn(),
   },
 }));
 
 const mockedApi = apiClient as unknown as {
   get: ReturnType<typeof vi.fn>;
+  post: ReturnType<typeof vi.fn>;
 };
 
 function order(orderId: number, orderDate: string): Order {
@@ -203,5 +205,19 @@ describe("OrderService", () => {
     });
 
     await expect(OrderService.getOrderItems(ACCOUNT, 42)).rejects.toThrow(AccountChangedError);
+  });
+
+  it("sends the receipt's body to the order's receive route, under its account, with a 60 s timeout (catches: body altered; default 15 s timeout; account left to the interceptor)", async () => {
+    mockedApi.post.mockResolvedValueOnce({ status: 200, data: "" });
+    const body = {
+      items: [{ orderItemId: 7, itemProductId: 500, itemProviderId: 3, batches: [{ quantity: 2, batchNumber: "LT2291" }] }],
+    };
+
+    await OrderService.receiveOrder(ACCOUNT, 42, body);
+
+    expect(mockedApi.post).toHaveBeenCalledWith("/order/42/receive", body, {
+      timeout: 60000,
+      headers: { "Account-Id": ACCOUNT },
+    });
   });
 });

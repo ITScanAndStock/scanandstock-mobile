@@ -1,10 +1,14 @@
 import type { AxiosResponse } from "axios";
 import type { Order, OrderFilter, OrderItem, OrderItemResponse, OrderResponse } from "../model/Order";
 import apiClient from "./ApiService";
+import type { ReceiveBody } from "./ReceiptDraft";
 
 const ORDER_PAGE_SIZE = 20;
 
 const MAX_PAGES_PER_STATUS = 10;
+
+// A large receipt can take the server longer than the client's default 15 s.
+const RECEIVE_TIMEOUT_MS = 60000;
 
 const TO_RECEIVE_STATUSES = ["En cours", "Partielle"] as const;
 
@@ -93,6 +97,14 @@ class OrderService {
   async getOrderItems(accountId: string, orderId: number): Promise<OrderItem[]> {
     const response = sentUnder(accountId, await apiClient.get<OrderItemResponse>(`/order/${orderId}`));
     return response?.content ?? [];
+  }
+
+  // The interceptor reads the active account after awaiting the token: a write cannot wait to learn whose it was.
+  async receiveOrder(accountId: string, orderId: number, body: ReceiveBody): Promise<void> {
+    await apiClient.post(`/order/${orderId}/receive`, body, {
+      timeout: RECEIVE_TIMEOUT_MS,
+      headers: { "Account-Id": accountId },
+    });
   }
 }
 

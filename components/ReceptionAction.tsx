@@ -1,10 +1,11 @@
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { useRouter } from "expo-router";
 
 import { colors } from "../constants/colors";
 import { useCanReceive } from "../hooks/useCanReceive";
 import type { Order } from "../model/Order";
 import { isReceivable } from "../services/OrderProgress";
+import PrimaryButton from "./PrimaryButton";
 
 export default function ReceptionAction({ order, style }: { order: Order; style?: StyleProp<ViewStyle> }) {
   const canReceive = useCanReceive(order.orderId);
@@ -22,15 +23,12 @@ export default function ReceptionAction({ order, style }: { order: Order; style?
   }
   return (
     <View style={style}>
-      <Pressable
-        style={styles.button}
+      <PrimaryButton
+        label="Réceptionner en scannant"
         onPress={() =>
           router.push({ pathname: "/orders/receive/[orderId]", params: { orderId: String(order.orderId) } })
         }
-        accessibilityRole="button"
-      >
-        <Text style={styles.buttonText}>Réceptionner en scannant</Text>
-      </Pressable>
+      />
     </View>
   );
 }
@@ -41,17 +39,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Medium",
     textAlign: "center",
-  },
-  button: {
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: colors.GREEN_DARK,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  buttonText: {
-    color: colors.WHITE,
-    fontSize: 16,
-    fontFamily: "SemiBold",
   },
 });

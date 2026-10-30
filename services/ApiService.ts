@@ -22,7 +22,7 @@ apiClient.interceptors.request.use(
     }
 
     const accountId = HeaderStore.getAccountId();
-    if (accountId) {
+    if (accountId && !config.headers["Account-Id"]) {
       config.headers["Account-Id"] = accountId;
     }
 
