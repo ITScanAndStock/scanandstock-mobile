@@ -12,10 +12,12 @@ import ReceiptLineSheet from "../../../../components/ReceiptLineSheet";
 import ReceiptScanCard from "../../../../components/ReceiptScanCard";
 import ScanBadge from "../../../../components/ScanBadge";
 import { colors } from "@/constants/colors";
+import { isTablet } from "@/constants/layout";
 import { useAccount } from "@/context/AccountContext";
 import { useScanCamera } from "@/context/ScanCameraContext";
 import { useCanReceive } from "@/hooks/useCanReceive";
 import { useGoToOrderList } from "@/hooks/useGoToOrderList";
+import { useIsLandscape } from "@/hooks/useIsLandscape";
 import { useOrderItems } from "@/hooks/useOrderItems";
 import { useSavedReceiptDraft } from "@/hooks/useSavedReceiptDraft";
 import { scanFeedback, type ScanSounds, useScanSounds } from "@/hooks/useScanSounds";
@@ -32,6 +34,9 @@ import { createReceiptScan } from "@/services/ReceiptScan";
 import { createReceiptSend, linesReceivedMeanwhile, type SendOutcome } from "@/services/ReceiptSend";
 import ToastService from "@/services/ToastService";
 import OrderCache from "@/state/OrderCache";
+
+const LINES_WIDTH_LANDSCAPE = 540;
+const LINES_WIDTH_PORTRAIT = 400;
 
 export default function OrderReceipt() {
   const navigation = useNavigation();
@@ -360,11 +365,17 @@ type ReceiptLayoutProps = {
 };
 
 function ReceiptLayout({ order, onLeave, camera, banner, overlay, header, children }: ReceiptLayoutProps) {
+  const tablet = isTablet();
+  const landscape = useIsLandscape();
+  const sheetStyle = tablet
+    ? [styles.sheetTablet, { width: landscape ? LINES_WIDTH_LANDSCAPE : LINES_WIDTH_PORTRAIT }]
+    : styles.sheet;
+  // One tree for every device and orientation: a rotation only restyles it, so the camera is not remounted.
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, tablet && styles.containerTablet]}>
       <View style={styles.cameraArea}>
         {camera}
-        <View style={styles.topRow} pointerEvents="box-none">
+        <View style={[styles.topRow, tablet && styles.topRowTablet]} pointerEvents="box-none">
           <Pressable style={styles.close} onPress={onLeave} accessibilityRole="button" accessibilityLabel="Quitter la réception">
             <CloseIcon width={22} height={22} accessible={false} />
           </Pressable>
@@ -374,12 +385,12 @@ function ReceiptLayout({ order, onLeave, camera, banner, overlay, header, childr
             </Text>
           </View>
         </View>
-        <View style={styles.badgeRow} pointerEvents="box-none">
+        <View style={[styles.badgeRow, tablet && styles.badgeRowTablet]} pointerEvents="box-none">
           <ScanBadge tone="overlay" />
         </View>
-        {banner ? <ReceiptScanCard banner={banner} style={styles.banner} /> : null}
+        {banner ? <ReceiptScanCard banner={banner} style={[styles.banner, tablet && styles.bannerTablet]} /> : null}
       </View>
-      <View style={styles.sheet}>
+      <View style={sheetStyle}>
         <View style={styles.sheetHeader}>{header}</View>
         {children}
       </View>
@@ -393,6 +404,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.RAIL_BG,
   },
+  containerTablet: {
+    flexDirection: "row",
+  },
   cameraArea: {
     flex: 1,
   },
@@ -404,6 +418,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+  },
+  topRowTablet: {
+    top: 28,
+    left: 24,
+    right: 24,
   },
   close: {
     width: 44,
@@ -432,6 +451,10 @@ const styles = StyleSheet.create({
     left: 16,
     flexDirection: "row",
   },
+  badgeRowTablet: {
+    top: 88,
+    left: 24,
+  },
   badgeNote: {
     color: colors.DECREASE_TEXT,
     fontSize: 12,
@@ -443,6 +466,11 @@ const styles = StyleSheet.create({
     right: 16,
     bottom: 40,
   },
+  bannerTablet: {
+    left: 24,
+    right: 24,
+    bottom: 28,
+  },
   sheet: {
     flex: 1,
     marginTop: -28,
@@ -451,6 +479,11 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     paddingTop: 16,
     paddingHorizontal: 20,
+  },
+  sheetTablet: {
+    backgroundColor: colors.SCREEN_BG,
+    paddingTop: 28,
+    paddingHorizontal: 28,
   },
   sheetHeader: {
     flexDirection: "row",

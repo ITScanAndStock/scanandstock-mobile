@@ -7,6 +7,7 @@ import Svg, { Path } from "react-native-svg";
 import { useScreenLeftInset } from "../../../../components/SideRail";
 import { useScreenBottomInset } from "../../../../components/TabBar";
 import { colors } from "@/constants/colors";
+import { isTablet } from "@/constants/layout";
 import { useAccount } from "@/context/AccountContext";
 import { useGoToOrderList } from "@/hooks/useGoToOrderList";
 import { formatOrderDate } from "@/services/OrderDate";
@@ -15,6 +16,7 @@ import OrderCache from "@/state/OrderCache";
 import ReceiptResults from "@/state/ReceiptResults";
 
 export default function OrderReceived() {
+  const tablet = isTablet();
   const goToList = useGoToOrderList();
   const insets = useSafeAreaInsets();
   const bottomInset = useScreenBottomInset();
@@ -35,9 +37,15 @@ export default function OrderReceived() {
     return <View style={styles.container} />;
   }
 
+  const backButton = (
+    <Pressable style={styles.button} onPress={goToList} accessibilityRole="button">
+      <Text style={styles.buttonText}>Retour aux commandes</Text>
+    </Pressable>
+  );
+
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingLeft: leftInset, paddingBottom: bottomInset }]}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, tablet && styles.contentTablet]}>
         <View style={styles.heading}>
           <View style={styles.check} accessible={false}>
             <Svg width={48} height={48} viewBox="0 0 24 24" fill="none">
@@ -86,12 +94,9 @@ export default function OrderReceived() {
             </>
           )}
         </View>
+        {tablet ? backButton : null}
       </ScrollView>
-      <View style={styles.footer}>
-        <Pressable style={styles.button} onPress={goToList} accessibilityRole="button">
-          <Text style={styles.buttonText}>Retour aux commandes</Text>
-        </Pressable>
-      </View>
+      {tablet ? null : <View style={styles.footer}>{backButton}</View>}
     </View>
   );
 }
@@ -109,6 +114,11 @@ const styles = StyleSheet.create({
     paddingTop: 48,
     paddingBottom: 16,
     gap: 22,
+  },
+  contentTablet: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingTop: 16,
   },
   heading: {
     alignItems: "center",
