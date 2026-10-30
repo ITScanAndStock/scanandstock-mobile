@@ -10,7 +10,10 @@ export type LineFormSave = { kind: "saved" } | { kind: "invalid"; message: strin
 type Parsed<T> = { ok: true; value: T } | { ok: false; message: string };
 
 const EXPIRATION_DIGITS = 8;
-const MAX_QUANTITY = 99999;
+export const MAX_QUANTITY = 99999;
+
+// The most the price field takes: six digits and two decimals.
+export const MAX_PRICE = 999999.99;
 
 export function maskExpiration(text: string): string {
   const digits = text.replace(/\D/g, "").slice(0, EXPIRATION_DIGITS);

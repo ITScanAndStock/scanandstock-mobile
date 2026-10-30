@@ -56,8 +56,9 @@ function setup() {
   draft.addBatch(7, { quantity: 2, batchNumber: "LT2291", expiration: { day: 31, month: 3, year: 2028 } });
   const refreshMovements = vi.fn();
   const scanSent = vi.fn();
-  const sender = createReceiptSend({ draft, orderId: ORDER_ID, refreshMovements, scanSent });
-  return { draft, refreshMovements, scanSent, sender };
+  const forgetDraft = vi.fn();
+  const sender = createReceiptSend({ draft, orderId: ORDER_ID, refreshMovements, scanSent, forgetDraft });
+  return { draft, refreshMovements, scanSent, forgetDraft, sender };
 }
 
 describe("ReceiptSend", () => {
@@ -187,6 +188,18 @@ describe("ReceiptSend", () => {
       expect(await sender.send()).toEqual({ kind: "failed", toast: ["La réception n'a pas pu être enregistrée"] });
     },
   );
+
+  it("forgets the saved draft once the receipt is recorded, and only then (catches: draft forgotten on a refusal or without an answer; kept after a success)", async () => {
+    const { sender, forgetDraft } = setup();
+    mockedApi.post.mockRejectedValueOnce(refusal(500)).mockRejectedValueOnce(NO_RESPONSE);
+
+    await sender.send();
+    await sender.send();
+    expect(forgetDraft).not.toHaveBeenCalled();
+
+    await sender.send(true);
+    expect(forgetDraft).toHaveBeenCalledTimes(1);
+  });
 
   it("keeps the draft after a refusal, sent whole on the next try (catches: draft emptied on an error)", async () => {
     mockedApi.post.mockRejectedValueOnce(refusal(500));

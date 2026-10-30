@@ -17,17 +17,19 @@ import { useScanCamera } from "@/context/ScanCameraContext";
 import { useCanReceive } from "@/hooks/useCanReceive";
 import { useGoToOrderList } from "@/hooks/useGoToOrderList";
 import { useOrderItems } from "@/hooks/useOrderItems";
+import { useSavedReceiptDraft } from "@/hooks/useSavedReceiptDraft";
 import { scanFeedback, type ScanSounds, useScanSounds } from "@/hooks/useScanSounds";
 import { useStats } from "@/hooks/useStats";
 import type { Order, OrderItem } from "@/model/Order";
 import { formatOrderDate } from "@/services/OrderDate";
 import { plural } from "@/services/Plural";
 import { type ReceiptBanner, receiptBanner } from "@/services/ReceiptBanner";
-import { createReceiptDraft, type DraftLine } from "@/services/ReceiptDraft";
+import type { DraftLine } from "@/services/ReceiptDraft";
+import { openReceiptDraft, type SavedReceiptDraft } from "@/services/ReceiptDraftStore";
 import { type LineForm, saveLineForm } from "@/services/ReceiptLineEdit";
 import ReceiptRecognizer from "@/services/ReceiptRecognizer";
 import { createReceiptScan } from "@/services/ReceiptScan";
-import { createReceiptSend, type SendOutcome } from "@/services/ReceiptSend";
+import { createReceiptSend, linesReceivedMeanwhile, type SendOutcome } from "@/services/ReceiptSend";
 import ToastService from "@/services/ToastService";
 import OrderCache from "@/state/OrderCache";
 
@@ -43,6 +45,7 @@ export default function OrderReceipt() {
   const canReceive = useCanReceive(order?.orderId);
   const allowed = !!order && canReceive === true;
   const { items, failed, retry } = useOrderItems(accountId, allowed ? order : undefined);
+  const saved = useSavedReceiptDraft(accountId, allowed ? order.orderId : undefined);
   const { setReceiptOpen } = useScanCamera();
 
   const leave = useCallback(() => {
@@ -85,8 +88,8 @@ export default function OrderReceipt() {
   if (!order || !allowed) {
     return <View style={styles.container} />;
   }
-  if (items) {
-    return <ReceiptSession order={order} items={items} onLeave={leave} onAccountChanged={goToList} />;
+  if (items && saved) {
+    return <ReceiptSession order={order} items={items} saved={saved} onLeave={leave} onAccountChanged={goToList} />;
   }
   return (
     <ReceiptLayout order={order} onLeave={leave} header={null}>
@@ -102,6 +105,7 @@ export default function OrderReceipt() {
 type ReceiptSessionProps = {
   order: Order;
   items: readonly OrderItem[];
+  saved: SavedReceiptDraft;
   onLeave: () => void;
   onAccountChanged: () => void;
 };
@@ -109,6 +113,7 @@ type ReceiptSessionProps = {
 type SessionOptions = {
   orderId: number;
   items: readonly OrderItem[];
+  saved: SavedReceiptDraft;
   sounds: ScanSounds;
   onBanner: (banner: ReceiptBanner) => void;
   onAccountChanged: () => void;
@@ -121,6 +126,7 @@ type SessionOptions = {
 function createSession({
   orderId,
   items,
+  saved,
   sounds,
   onBanner,
   onAccountChanged,
@@ -129,8 +135,8 @@ function createSession({
   connectBadge,
   scanSent,
 }: SessionOptions) {
-  const draft = createReceiptDraft(items);
-  const sender = createReceiptSend({ draft, orderId, refreshMovements, scanSent });
+  const { draft, touched, forget } = openReceiptDraft(saved, items, Date.now);
+  const sender = createReceiptSend({ draft, orderId, refreshMovements, scanSent, forgetDraft: forget });
   const scan = createReceiptScan({
     draft,
     recognize: (code, group, apply) => ReceiptRecognizer.recognize(code, group, apply),
@@ -146,7 +152,7 @@ function createSession({
     badge: { isValid: isBadgeValid, connect: connectBadge },
     onBadge: (connected) => scanFeedback(sounds, connected),
   });
-  return { draft, scan, sender };
+  return { draft, scan, sender, touched };
 }
 
 const BADGE_PROMPT: ReceiptBanner = {
@@ -155,7 +161,7 @@ const BADGE_PROMPT: ReceiptBanner = {
   detail: "Votre cabinet trace les mouvements de stock",
 };
 
-function ReceiptSession({ order, items, onLeave, onAccountChanged }: ReceiptSessionProps) {
+function ReceiptSession({ order, items, saved, onLeave, onAccountChanged }: ReceiptSessionProps) {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const { cameraTurn } = useScanCamera();
@@ -166,10 +172,11 @@ function ReceiptSession({ order, items, onLeave, onAccountChanged }: ReceiptSess
   const [banner, setBanner] = useState<ReceiptBanner | null>(null);
   const [sending, setSending] = useState(false);
   const [sheetItemId, setSheetItemId] = useState<number | null>(null);
-  const [{ draft, scan, sender }] = useState(() =>
+  const [{ draft, scan, sender, touched }] = useState(() =>
     createSession({
       orderId: order.orderId,
       items,
+      saved,
       sounds,
       onBanner: setBanner,
       onAccountChanged,
@@ -182,6 +189,27 @@ function ReceiptSession({ order, items, onLeave, onAccountChanged }: ReceiptSess
   const phase = useSyncExternalStore(scan.subscribe, scan.phase);
 
   useEffect(() => () => scan.close(), [scan]);
+
+  useEffect(() => {
+    if (touched > 0) {
+      ToastService.info(...linesReceivedMeanwhile(touched));
+    }
+  }, [touched]);
+
+  useEffect(() => {
+    if (phase !== "resume") {
+      return;
+    }
+    Alert.alert(
+      `Réception commencée par ${scan.startedBy() ?? "un autre badge"}`,
+      "Reprise, elle partira sous votre badge.",
+      [
+        { text: "Recommencer", style: "destructive", onPress: scan.restart },
+        { text: "Reprendre", onPress: scan.resume },
+      ],
+      { cancelable: false },
+    );
+  }, [phase, scan]);
 
   const closeSheet = useCallback(() => {
     scan.closeSheet();
@@ -229,12 +257,7 @@ function ReceiptSession({ order, items, onLeave, onAccountChanged }: ReceiptSess
         onAccountChanged();
         return;
       case "linesChanged":
-        ToastService.info(
-          outcome.count > 1
-            ? `${outcome.count} lignes ont été reçues entre-temps : leurs scans ont été retirés`
-            : "1 ligne a été reçue entre-temps : ses scans ont été retirés",
-          "Commande modifiée",
-        );
+        ToastService.info(...linesReceivedMeanwhile(outcome.count));
         return;
       case "confirmUncertain":
         Alert.alert("Envoi incertain", "Vérifiez que la réception n'est pas déjà passée.", [
@@ -318,7 +341,7 @@ function ReceiptSession({ order, items, onLeave, onAccountChanged }: ReceiptSess
         <PrimaryButton
           label={sending ? "Envoi en cours…" : `Réceptionner ${plural(scanned, "produit")}`}
           onPress={() => requestSend(false)}
-          disabled={scanned === 0 || sending || phase === "badge"}
+          disabled={scanned === 0 || sending || phase !== "products"}
           busy={sending}
         />
       </View>

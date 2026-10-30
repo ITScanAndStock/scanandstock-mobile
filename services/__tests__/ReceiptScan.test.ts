@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OrderItem } from "../../model/Order";
 import HeaderStore from "../../state/HeaderStore";
-import { createReceiptDraft } from "../ReceiptDraft";
+import { createReceiptDraft, type ReceiptDraft } from "../ReceiptDraft";
 import type { ApplyCode, Recognition } from "../ReceiptRecognizer";
 import { createReceiptScan } from "../ReceiptScan";
 
@@ -28,6 +28,11 @@ const ITEM: OrderItem = {
   itemDeliveredQuantity: 0,
 };
 
+function wearBadge(name: string, scan = `BADGE-${name.toUpperCase()}`) {
+  HeaderStore.setBadgeScan(scan);
+  HeaderStore.setBadgeName(name);
+}
+
 let clock = 1000;
 function show(receipt: ReturnType<typeof createReceiptScan>, code: string) {
   for (let frame = 0; frame < 3; frame += 1) {
@@ -37,8 +42,14 @@ function show(receipt: ReturnType<typeof createReceiptScan>, code: string) {
 
 type BadgeAnswer = Deferred<boolean>;
 
-function setup({ badgeValid = true }: { badgeValid?: boolean } = {}) {
-  const draft = createReceiptDraft([ITEM]);
+function setup({
+  badgeValid = true,
+  badgeName,
+  draft = createReceiptDraft([ITEM]),
+}: { badgeValid?: boolean; badgeName?: string; draft?: ReceiptDraft } = {}) {
+  if (badgeName) {
+    wearBadge(badgeName);
+  }
   const badge = { valid: badgeValid };
   const badgeAnswers: BadgeAnswer[] = [];
   const connect = vi.fn((_code: string) => {
@@ -71,6 +82,7 @@ function setup({ badgeValid = true }: { badgeValid?: boolean } = {}) {
 
 describe("ReceiptScan", () => {
   beforeEach(() => {
+    HeaderStore.reset();
     HeaderStore.setAccountId("12");
     HeaderStore.setTracingEnabled(false);
   });
@@ -379,6 +391,114 @@ describe("ReceiptScan", () => {
       await flush();
 
       expect(receipt.phase()).toBe("products");
+      expect(send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("draft started under another badge", () => {
+    beforeEach(() => {
+      HeaderStore.setTracingEnabled(true);
+    });
+
+    function draftScannedBy(name: string) {
+      const first = setup({ badgeName: name });
+      first.draft.apply({ group: 1, gtin: GTIN });
+      return first.draft;
+    }
+
+    it("tells who started a draft resumed under another badge (catches: the starting badge's name not kept)", () => {
+      const { receipt } = setup({ badgeName: "Marc", draft: draftScannedBy("Julie") });
+
+      expect(receipt.phase()).toBe("resume");
+      expect(receipt.startedBy()).toBe("Julie");
+    });
+
+    it("asks a badge that shares the starting badge's name (catches: badges compared on their name)", () => {
+      const draft = draftScannedBy("Julie");
+      wearBadge("Julie", "BADGE-JULIE-2");
+
+      const { receipt } = setup({ draft });
+
+      expect(receipt.phase()).toBe("resume");
+    });
+
+    it("asks nothing of the badge that started the draft (catches: the question asked whatever the badge)", () => {
+      expect(setup({ badgeName: "Julie", draft: draftScannedBy("Julie") }).receipt.phase()).toBe("products");
+    });
+
+    it("asks nothing for a draft with no scan, which the new badge takes over (catches: question asked for an empty draft)", () => {
+      const empty = createReceiptDraft([ITEM]);
+      empty.setMarks({ badgeScan: "BADGE-JULIE", badgeName: "Julie" });
+
+      const { receipt, draft } = setup({ badgeName: "Marc", draft: empty });
+
+      expect(receipt.phase()).toBe("products");
+      expect(draft.marks()).toMatchObject({ badgeScan: "BADGE-MARC", badgeName: "Marc" });
+    });
+
+    it("asks nothing when the cabinet does not trace (catches: tracing ignored)", () => {
+      const draft = draftScannedBy("Julie");
+      HeaderStore.setTracingEnabled(false);
+
+      expect(setup({ badgeName: "Marc", draft }).receipt.phase()).toBe("products");
+    });
+
+    it("counts no code shown while the question is asked (catches: frames passed on during the question)", () => {
+      const { receipt, recognize } = setup({ badgeName: "Marc", draft: draftScannedBy("Julie") });
+
+      show(receipt, "0003401234567890");
+
+      expect(recognize).not.toHaveBeenCalled();
+    });
+
+    it("keeps the scans when resumed, now under the current badge (catches: scans dropped; starting badge kept, asked again next time)", () => {
+      const { receipt, draft } = setup({ badgeName: "Marc", draft: draftScannedBy("Julie") });
+
+      receipt.resume();
+
+      expect(receipt.phase()).toBe("products");
+      expect(draft.count()).toBe(1);
+      expect(draft.marks()).toMatchObject({ badgeScan: "BADGE-MARC", badgeName: "Marc" });
+    });
+
+    it("drops the scans when started again, under the current badge (catches: scans kept on a restart)", () => {
+      const { receipt, draft } = setup({ badgeName: "Marc", draft: draftScannedBy("Julie") });
+
+      receipt.restart();
+
+      expect(receipt.phase()).toBe("products");
+      expect(draft.count()).toBe(0);
+      expect(draft.marks().badgeName).toBe("Marc");
+    });
+
+    it("compares after the badge step, holding the waiting send until the answer (catches: compared before the badge; sent before the answer)", async () => {
+      const { receipt, badge, badgeAnswers } = setup({ badgeValid: false, draft: draftScannedBy("Julie") });
+      const send = vi.fn();
+      expect(receipt.phase()).toBe("badge");
+
+      receipt.requestSend(send);
+      show(receipt, "BADGE-MARC");
+      wearBadge("Marc");
+      badgeAnswers[0].resolve(true);
+      await flush();
+
+      expect(receipt.phase()).toBe("resume");
+      expect(send).not.toHaveBeenCalled();
+      receipt.resume();
+      expect(send).toHaveBeenCalledTimes(1);
+    });
+
+    it("drops the waiting send when started again (catches: an empty receipt sent)", async () => {
+      const { receipt, badge, badgeAnswers } = setup({ badgeValid: false, draft: draftScannedBy("Julie") });
+      const send = vi.fn();
+
+      receipt.requestSend(send);
+      show(receipt, "BADGE-MARC");
+      wearBadge("Marc");
+      badgeAnswers[0].resolve(true);
+      await flush();
+      receipt.restart();
+
       expect(send).not.toHaveBeenCalled();
     });
   });

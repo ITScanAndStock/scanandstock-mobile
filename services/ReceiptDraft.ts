@@ -29,7 +29,13 @@ export type ScanOutcome =
   | { kind: "lineComplete"; orderItemId: number }
   | { kind: "notInOrder" };
 
-export type DraftMarks = { updatedAt: number | null; uncertainSend: boolean; badgeName: string | null };
+// The badge is compared on its scan, unique to it; its name is only shown.
+export type DraftMarks = {
+  updatedAt: number | null;
+  uncertainSend: boolean;
+  badgeScan: string | null;
+  badgeName: string | null;
+};
 
 export type ReceiveItem = {
   orderItemId: number;
@@ -41,6 +47,8 @@ export type ReceiveItem = {
 };
 
 export type ReceiveBody = { items: ReceiveItem[] };
+
+export type DraftSnapshot = { lines: DraftLine[]; marks: DraftMarks };
 
 export type ReceiptDraft = {
   apply: (code: RecognizedCode) => ScanOutcome;
@@ -54,6 +62,9 @@ export type ReceiptDraft = {
   lines: () => DraftLine[];
   marks: () => DraftMarks;
   setMarks: (changes: Partial<DraftMarks>) => void;
+  restart: () => void;
+  snapshot: () => DraftSnapshot;
+  subscribe: (listener: () => void) => () => void;
 };
 
 type LastUnit = { group: number; orderItemId: number; identity: BatchIdentity; providerChoice: boolean };
@@ -117,10 +128,30 @@ function takeUnit(line: DraftLine, identity: BatchIdentity) {
   }
 }
 
+const copyLines = (lines: readonly DraftLine[]) =>
+  lines.map((line) => ({ ...line, batches: line.batches.map((batch) => ({ ...batch })) }));
+
 export function createReceiptDraft(items: readonly OrderItem[]): ReceiptDraft {
-  let lines = [...items].sort(byOrderItemId).map(freshLine);
+  return draftFrom([...items].sort(byOrderItemId).map(freshLine), {
+    updatedAt: null,
+    uncertainSend: false,
+    badgeScan: null,
+    badgeName: null,
+  });
+}
+
+// Read again like a send: a line received elsewhere since the draft was saved loses its batches.
+export function restoreReceiptDraft(saved: DraftSnapshot, reloaded: readonly OrderItem[]) {
+  const draft = draftFrom(copyLines(saved.lines), { ...saved.marks });
+  return { draft, touched: draft.reconcile(reloaded) };
+}
+
+function draftFrom(initialLines: DraftLine[], initialMarks: DraftMarks): ReceiptDraft {
+  let lines = initialLines;
   let lastUnit: LastUnit | null = null;
-  let marks: DraftMarks = { updatedAt: null, uncertainSend: false, badgeName: null };
+  let marks = initialMarks;
+  const listeners = new Set<() => void>();
+  const changed = () => listeners.forEach((listener) => listener());
 
   const lineOf = (orderItemId: number) => {
     const line = lines.find((candidate) => candidate.item.orderItemId === orderItemId);
@@ -133,6 +164,7 @@ export function createReceiptDraft(items: readonly OrderItem[]): ReceiptDraft {
   const editBatches = (orderItemId: number, edit: (batches: DraftBatch[]) => void) => {
     edit(lineOf(orderItemId).batches);
     lastUnit = null;
+    changed();
   };
 
   const editBatchAt = (orderItemId: number, index: number, edit: (batches: DraftBatch[]) => void) => {
@@ -160,27 +192,35 @@ export function createReceiptDraft(items: readonly OrderItem[]): ReceiptDraft {
     return { kind: "added", orderItemId, ...target, merged: true, providerChoice };
   };
 
+  const applyCode = (code: RecognizedCode): ScanOutcome => {
+    const identity = identityOf(code);
+    const merged = mergeIntoLastUnit(code, identity);
+    if (merged) {
+      return merged;
+    }
+
+    const byGtin = lines.filter((line) => matchesGtin(line, code.gtin));
+    const byProduct = lines.filter((line) => matchesProduct(line, code.productIds));
+    const openByGtin = byGtin.filter((line) => !isComplete(line));
+    const candidates = openByGtin.length > 0 ? openByGtin : byProduct.filter((line) => !isComplete(line));
+    const chosen = candidates[0];
+    if (chosen) {
+      const providerChoice = candidates.some((line) => line.item.itemProviderId !== chosen.item.itemProviderId);
+      addUnit(chosen, identity);
+      lastUnit = { group: code.group, orderItemId: chosen.item.orderItemId, identity, providerChoice };
+      return { kind: "added", orderItemId: chosen.item.orderItemId, ...identity, merged: false, providerChoice };
+    }
+    const matched = byGtin[0] ?? byProduct[0];
+    return matched ? { kind: "lineComplete", orderItemId: matched.item.orderItemId } : { kind: "notInOrder" };
+  };
+
   return {
     apply: (code) => {
-      const identity = identityOf(code);
-      const merged = mergeIntoLastUnit(code, identity);
-      if (merged) {
-        return merged;
+      const outcome = applyCode(code);
+      if (outcome.kind === "added") {
+        changed();
       }
-
-      const byGtin = lines.filter((line) => matchesGtin(line, code.gtin));
-      const byProduct = lines.filter((line) => matchesProduct(line, code.productIds));
-      const openByGtin = byGtin.filter((line) => !isComplete(line));
-      const candidates = openByGtin.length > 0 ? openByGtin : byProduct.filter((line) => !isComplete(line));
-      const chosen = candidates[0];
-      if (chosen) {
-        const providerChoice = candidates.some((line) => line.item.itemProviderId !== chosen.item.itemProviderId);
-        addUnit(chosen, identity);
-        lastUnit = { group: code.group, orderItemId: chosen.item.orderItemId, identity, providerChoice };
-        return { kind: "added", orderItemId: chosen.item.orderItemId, ...identity, merged: false, providerChoice };
-      }
-      const matched = byGtin[0] ?? byProduct[0];
-      return matched ? { kind: "lineComplete", orderItemId: matched.item.orderItemId } : { kind: "notInOrder" };
+      return outcome;
     },
     correctBatch: (orderItemId, index, entry) =>
       editBatchAt(orderItemId, index, (batches) => {
@@ -193,6 +233,7 @@ export function createReceiptDraft(items: readonly OrderItem[]): ReceiptDraft {
     removeBatch: (orderItemId, index) => editBatchAt(orderItemId, index, (batches) => batches.splice(index, 1)),
     setPrice: (orderItemId, price) => {
       lineOf(orderItemId).correctedPrice = price;
+      changed();
     },
     count: () => lines.reduce((sum, line) => sum + draftQuantity(line), 0),
     receiveBody: () => ({
@@ -235,12 +276,26 @@ export function createReceiptDraft(items: readonly OrderItem[]): ReceiptDraft {
       }
       lines = next;
       lastUnit = null;
+      changed();
       return touched.sort((a, b) => a - b);
     },
-    lines: () => lines.map((line) => ({ ...line, batches: line.batches.map((batch) => ({ ...batch })) })),
+    lines: () => copyLines(lines),
     marks: () => ({ ...marks }),
     setMarks: (changes) => {
       marks = { ...marks, ...changes };
+      changed();
+    },
+    restart: () => {
+      lines = lines.map((line) => freshLine(line.item));
+      lastUnit = null;
+      changed();
+    },
+    snapshot: () => ({ lines: copyLines(lines), marks: { ...marks } }),
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
     },
   };
 }

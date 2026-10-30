@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { OrderItem } from "../../model/Order";
-import { createReceiptDraft, type ReceiptDraft, type RecognizedCode } from "../ReceiptDraft";
+import { createReceiptDraft, type ReceiptDraft, type RecognizedCode, restoreReceiptDraft } from "../ReceiptDraft";
 
 const GTIN = "3401234567890";
 const OTHER_GTIN = "3409876543210";
@@ -377,11 +377,75 @@ describe("ReceiptDraft", () => {
   describe("marks", () => {
     it("starts with no modification date, no uncertain send and no badge, and keeps what is set (catches: setMarks ignores its changes)", () => {
       const draft = createReceiptDraft([item(1)]);
-      expect(draft.marks()).toEqual({ updatedAt: null, uncertainSend: false, badgeName: null });
+      expect(draft.marks()).toEqual({ updatedAt: null, uncertainSend: false, badgeScan: null, badgeName: null });
 
-      draft.setMarks({ updatedAt: 1_700_000_000_000, uncertainSend: true, badgeName: "Julie" });
+      draft.setMarks({ updatedAt: 1_700_000_000_000, uncertainSend: true, badgeScan: "B-7", badgeName: "Julie" });
 
-      expect(draft.marks()).toEqual({ updatedAt: 1_700_000_000_000, uncertainSend: true, badgeName: "Julie" });
+      expect(draft.marks()).toEqual({ updatedAt: 1_700_000_000_000, uncertainSend: true, badgeScan: "B-7", badgeName: "Julie" });
+    });
+  });
+
+  describe("restoring a saved draft", () => {
+    it("drops the scans of a line received elsewhere since the draft was saved (catches: saved lines restored without reading them again)", () => {
+      const draft = createReceiptDraft([item(1), item(2, { itemGtin: OTHER_GTIN })]);
+      draft.apply(code());
+      draft.apply(code({ gtin: OTHER_GTIN }));
+
+      const { draft: restored, touched } = restoreReceiptDraft(draft.snapshot(), [
+        item(1, { itemDeliveredQuantity: 3 }),
+        item(2, { itemGtin: OTHER_GTIN }),
+      ]);
+
+      expect(touched).toEqual([1]);
+      expect(restored.receiveBody().items.map((sent) => sent.orderItemId)).toEqual([2]);
+    });
+
+    it("leaves the saved draft untouched by the restored one (catches: saved lines shared with the restored draft)", () => {
+      const draft = createReceiptDraft([item(1)]);
+      draft.apply(code());
+      const saved = draft.snapshot();
+
+      restoreReceiptDraft(saved, [item(1)]).draft.apply(code());
+
+      expect(saved.lines[0].batches).toEqual([{ quantity: 1 }]);
+    });
+  });
+
+  describe("starting again", () => {
+    it("drops every scan and correction but keeps the marks (catches: batches kept; uncertain send forgotten; last unit kept)", () => {
+      const draft = createReceiptDraft([item(1), item(2, { itemGtin: OTHER_GTIN })]);
+      draft.addBatch(2, { quantity: 2 });
+      draft.apply(code({ group: 1, ...L1 }));
+      draft.setMarks({ uncertainSend: true, badgeName: "Julie" });
+
+      draft.restart();
+
+      expect(draft.count()).toBe(0);
+      expect(draft.marks()).toMatchObject({ uncertainSend: true, badgeName: "Julie" });
+      expect(draft.apply(code({ group: 1, gtin: GTIN }))).toMatchObject({ kind: "added", merged: false });
+    });
+  });
+
+  describe("change notifications", () => {
+    it("notifies once per change and not for a refused code (catches: a kind of change not notified; a refused code notified)", () => {
+      const draft = createReceiptDraft([item(1)]);
+      const listener = vi.fn();
+      const unsubscribe = draft.subscribe(listener);
+
+      draft.apply(code());
+      draft.apply(code({ gtin: OTHER_GTIN }));
+      draft.correctBatch(1, 0, { quantity: 2 });
+      draft.addBatch(1, { quantity: 1, batchNumber: "L9" });
+      draft.removeBatch(1, 1);
+      draft.setPrice(1, 14);
+      draft.setMarks({ badgeName: "Julie" });
+      draft.reconcile([item(1)]);
+      draft.restart();
+      expect(listener).toHaveBeenCalledTimes(8);
+
+      unsubscribe();
+      draft.apply(code());
+      expect(listener).toHaveBeenCalledTimes(8);
     });
   });
 });

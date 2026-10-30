@@ -14,7 +14,8 @@ const TO_RECEIVE_STATUSES = ["En cours", "Partielle"] as const;
 
 export type OrderPage = { orders: Order[]; hasMore: boolean; nextOffset: number };
 
-export type OrdersToReceive = { orders: Order[]; count: number };
+// complete is false when a status had more pages than MAX_PAGES_PER_STATUS: an order missing from it may still be open.
+export type OrdersToReceive = { orders: Order[]; count: number; complete: boolean };
 
 // The API sorts on the date alone, with no tie-breaker: an order can come back on two pages.
 export function appendOrders(loaded: readonly Order[], incoming: readonly Order[]): Order[] {
@@ -41,7 +42,7 @@ async function fetchPage(accountId: string, offset: number, status?: string): Pr
   return sentUnder(accountId, await apiClient.get<OrderResponse>("/order", { params }));
 }
 
-type StatusList = { orders: Order[]; filters?: OrderFilter[] };
+type StatusList = { orders: Order[]; filters?: OrderFilter[]; complete: boolean };
 
 async function fetchStatus(accountId: string, status: string): Promise<StatusList> {
   let orders: Order[] = [];
@@ -50,15 +51,15 @@ async function fetchStatus(accountId: string, status: string): Promise<StatusLis
     const offset = pageIndex * ORDER_PAGE_SIZE;
     const page = await fetchPage(accountId, offset, status);
     if (!page) {
-      break;
+      return { orders, filters, complete: true };
     }
     orders = appendOrders(orders, page.content);
     filters ??= page.filters;
     if (offset + ORDER_PAGE_SIZE >= (page.filteredCount ?? page.total)) {
-      break;
+      return { orders, filters, complete: true };
     }
   }
-  return { orders, filters };
+  return { orders, filters, complete: false };
 }
 
 // The API computes its status counts without the request's filter: every non-empty response carries the same ones.
@@ -91,6 +92,7 @@ class OrderService {
     return {
       orders: appendOrders(pending.orders, partial.orders).sort(newestFirst),
       count: countToReceive(pending.filters ?? partial.filters),
+      complete: pending.complete && partial.complete,
     };
   }
 

@@ -24,11 +24,19 @@ type ReceiptSendOptions = {
   orderId: number;
   refreshMovements: () => void;
   scanSent: () => void;
+  forgetDraft: () => void;
 };
 
 const RELOAD_FAILED: ErrorToastArgs = ["Impossible de relire la commande avant l'envoi : réessayez.", "Réception non envoyée"];
 
 const NOT_RECORDED: ErrorToastArgs = ["La réception n'a pas pu être enregistrée"];
+
+export const linesReceivedMeanwhile = (count: number): [message: string, title: string] => [
+  count > 1
+    ? `${count} lignes ont été reçues entre-temps : leurs scans ont été retirés`
+    : "1 ligne a été reçue entre-temps : ses scans ont été retirés",
+  "Commande modifiée",
+];
 
 function refusalOutcome(error: AxiosErrorType): SendOutcome {
   const { response } = error;
@@ -52,7 +60,7 @@ function refusalOutcome(error: AxiosErrorType): SendOutcome {
   return { kind: "failed", toast: NOT_RECORDED };
 }
 
-export function createReceiptSend({ draft, orderId, refreshMovements, scanSent }: ReceiptSendOptions) {
+export function createReceiptSend({ draft, orderId, refreshMovements, scanSent, forgetDraft }: ReceiptSendOptions) {
   const accountId = HeaderStore.getAccountId();
   // Not React state: a second press before the re-render must not send twice.
   let sending = false;
@@ -94,6 +102,7 @@ export function createReceiptSend({ draft, orderId, refreshMovements, scanSent }
       return refusalOutcome(refusal);
     }
     draft.setMarks({ uncertainSend: false });
+    forgetDraft();
     refreshMovements();
     setTimeout(refreshMovements, LATER_MOVEMENTS_RELOAD_MS);
     ReceiptResults.remember(accountId, orderId, result);
