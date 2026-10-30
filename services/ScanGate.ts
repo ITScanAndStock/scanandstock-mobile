@@ -13,7 +13,7 @@ const normalize = (raw: string) => raw.replace(/\x1D/g, "$");
 
 type Hold = { groupLastSeen: number; ownLastSeen: number; delay: number; group: number };
 
-export type ScanDecision = { kind: "send"; code: string } | { kind: "ignore"; reason?: "invalid" };
+export type ScanDecision = { kind: "send"; code: string; group: number } | { kind: "ignore"; reason?: "invalid" };
 
 export type ScanGate = {
   frame: (raw: string, now: number) => ScanDecision;
@@ -126,9 +126,10 @@ export function createScanGate(): ScanGate {
       }
       resetCount();
       busy = true;
-      held.set(code, { groupLastSeen: now, ownLastSeen: now, delay: REARM_DELAY_MS, group: groupForNewHold() });
+      const group = groupForNewHold();
+      held.set(code, { groupLastSeen: now, ownLastSeen: now, delay: REARM_DELAY_MS, group });
       lastSent = code;
-      return { kind: "send", code };
+      return { kind: "send", code, group };
     },
     sendFinished: () => {
       busy = false;

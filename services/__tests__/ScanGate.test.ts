@@ -47,6 +47,10 @@ function sends(decisions: ScanDecision[]) {
   return decisions.filter((decision) => decision.kind === "send");
 }
 
+function sentGroups(decisions: ScanDecision[]) {
+  return decisions.flatMap((decision) => (decision.kind === "send" ? [decision.group] : []));
+}
+
 function alternate(gate: ScanGate, codes: string[], from: number, to: number) {
   const decisions: ScanDecision[] = [];
   for (let t = from, i = 0; t <= to; t += FRAME_STEP_MS, i++) {
@@ -62,7 +66,7 @@ describe("ScanGate", () => {
     const decisions = frames(gate, "AAAA", 0, 3);
 
     expect(decisions.map((decision) => decision.kind)).toEqual(["ignore", "ignore", "send"]);
-    expect(decisions[2]).toEqual({ kind: "send", code: "AAAA" });
+    expect(decisions[2]).toEqual({ kind: "send", code: "AAAA", group: expect.any(Number) });
   });
 
   it("sends nothing on A, A, B, A (catches: count not reset to 1 by another code)", () => {
@@ -78,7 +82,7 @@ describe("ScanGate", () => {
 
     const decisions = ["AAAA", "BBBB", "BBBB", "BBBB"].map((code, i) => gate.frame(code, i * FRAME_STEP_MS));
 
-    expect(decisions[3]).toEqual({ kind: "send", code: "BBBB" });
+    expect(decisions[3]).toEqual({ kind: "send", code: "BBBB", group: expect.any(Number) });
   });
 
   it("keeps the count across an invalid code: A, A, 3-char code, A sends (catches: invalid code resets the count)", () => {
@@ -86,7 +90,7 @@ describe("ScanGate", () => {
 
     const decisions = ["AAAA", "AAAA", "XYZ", "AAAA"].map((code, i) => gate.frame(code, i * FRAME_STEP_MS));
 
-    expect(decisions[3]).toEqual({ kind: "send", code: "AAAA" });
+    expect(decisions[3]).toEqual({ kind: "send", code: "AAAA", group: expect.any(Number) });
   });
 
   it("ignores 3- and 101-char codes as invalid, accepts 4 and 100 (catches: bounds off by one)", () => {
@@ -94,9 +98,9 @@ describe("ScanGate", () => {
 
     expect(gate.frame("x".repeat(3), 0)).toEqual({ kind: "ignore", reason: "invalid" });
     expect(gate.frame("x".repeat(101), 100)).toEqual({ kind: "ignore", reason: "invalid" });
-    expect(sends(frames(gate, "y".repeat(4), 200, 3))).toEqual([{ kind: "send", code: "y".repeat(4) }]);
+    expect(sends(frames(gate, "y".repeat(4), 200, 3))).toEqual([{ kind: "send", code: "y".repeat(4), group: expect.any(Number) }]);
     gate.sendFinished(true);
-    expect(sends(frames(gate, "z".repeat(100), 500, 3))).toEqual([{ kind: "send", code: "z".repeat(100) }]);
+    expect(sends(frames(gate, "z".repeat(100), 500, 3))).toEqual([{ kind: "send", code: "z".repeat(100), group: expect.any(Number) }]);
   });
 
   it("sends a raw code with \\x1D as $ (catches: no cleaning)", () => {
@@ -104,7 +108,7 @@ describe("ScanGate", () => {
 
     const decisions = frames(gate, "01\x1D21AB", 0, 3);
 
-    expect(decisions[2]).toEqual({ kind: "send", code: "01$21AB" });
+    expect(decisions[2]).toEqual({ kind: "send", code: "01$21AB", group: expect.any(Number) });
   });
 
   it("is busy between a send and sendFinished only", () => {
@@ -185,6 +189,31 @@ describe("ScanGate", () => {
     const sent = scanCodes(gate, (i) => (Math.floor(i / 3) % 2 === 0 ? "AAAA" : "BBBB"), 0, 6000);
 
     expect(sent).toEqual(["AAAA@200", "BBBB@1100"]);
+  });
+
+  it("gives both codes of a two-code box the same group (catches: a new group on each send)", () => {
+    const gate = createScanGate();
+    const decisions: ScanDecision[] = [];
+    for (let t = 0, i = 0; t <= 2000; t += FRAME_STEP_MS, i++) {
+      if (t === 500) {
+        gate.sendFinished(true);
+      }
+      decisions.push(gate.frame(Math.floor(i / 3) % 2 === 0 ? "AAAA" : "BBBB", t));
+    }
+
+    const [first, second] = sentGroups(decisions);
+    expect(sends(decisions).map((decision) => decision.kind === "send" && decision.code)).toEqual(["AAAA", "BBBB"]);
+    expect(second).toBe(first);
+  });
+
+  it("gives two boxes separated by more than REARM_DELAY_MS of absence different groups (catches: a constant group)", () => {
+    const gate = createScanGate();
+    const [first] = sentGroups(frames(gate, "AAAA", 0, 3));
+    gate.sendFinished(true);
+
+    const [second] = sentGroups(frames(gate, "BBBB", 200 + REARM_DELAY_MS + FRAME_STEP_MS, 3));
+
+    expect(second).not.toBe(first);
   });
 
   it("keeps holding a code of a two-code box while the camera only reports the other one for 5 s (catches: a frame only extends its own code)", () => {
