@@ -1,17 +1,18 @@
-import { useCallback, useEffect } from "react";
+import { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 
 import ChevronBack from "../../../assets/images/figma/chevron-back.svg";
 import Header from "../../../components/Header";
 import { formatPrice, OrderStatusPill, providerNames } from "../../../components/OrderCard";
 import OrderItemsBody from "../../../components/OrderItemsBody";
-import ReceptionNote from "../../../components/ReceptionNote";
+import ReceptionAction from "../../../components/ReceptionAction";
 import { useScreenLeftInset } from "../../../components/SideRail";
 import { useScreenBottomInset } from "../../../components/TabBar";
 import { colors } from "@/constants/colors";
 import { isTablet } from "@/constants/layout";
 import { useAccount } from "@/context/AccountContext";
+import { useGoToOrderList } from "@/hooks/useGoToOrderList";
 import { useOrderItems } from "@/hooks/useOrderItems";
 import { formatOrderDate } from "@/services/OrderDate";
 import { orderProgress } from "@/services/OrderProgress";
@@ -23,21 +24,13 @@ export default function OrderDetail() {
   const tablet = isTablet();
   const bottomInset = useScreenBottomInset();
   const leftInset = useScreenLeftInset();
-  const navigation = useNavigation();
-  const router = useRouter();
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const { activeAccount } = useAccount();
   const accountId = activeAccount?.id;
   const order = accountId ? OrderCache.get(accountId, Number(orderId)) : undefined;
   const { items, failed, retry } = useOrderItems(accountId, order);
 
-  const goToList = useCallback(() => {
-    if ((navigation.getState()?.index ?? 0) > 0) {
-      navigation.dispatch({ type: "POP_TO_TOP" });
-    } else {
-      router.replace("/orders");
-    }
-  }, [navigation, router]);
+  const goToList = useGoToOrderList();
 
   // Opened without the list (deep link): the header has no source, the API has no route for it.
   useEffect(() => {
@@ -90,7 +83,7 @@ export default function OrderDetail() {
         ) : null}
       </View>
       <OrderItemsBody items={items} failed={failed} onRetry={retry} tableLayout={false} contentContainerStyle={styles.list} />
-      <ReceptionNote order={order} style={styles.footer} />
+      <ReceptionAction order={order} style={styles.footer} />
     </View>
   );
 }

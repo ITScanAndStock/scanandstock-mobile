@@ -133,13 +133,41 @@ describe("ReceiptDraft", () => {
     });
   });
 
+  describe("provider choice", () => {
+    it("tells when another open line of another provider matched too (catches: providers never compared)", () => {
+      const draft = createReceiptDraft([item(1), item(2, { itemProviderId: 8 })]);
+
+      expect(draft.apply(code())).toMatchObject({ kind: "added", orderItemId: 1, providerChoice: true });
+    });
+
+    it("tells no choice when the other line is of the same provider (catches: any second open line counted)", () => {
+      const draft = createReceiptDraft([item(1), item(2)]);
+
+      expect(draft.apply(code())).toMatchObject({ kind: "added", orderItemId: 1, providerChoice: false });
+    });
+
+    it("keeps the provider choice when the second code of the box completes the unit (catches: choice dropped on merge)", () => {
+      const draft = createReceiptDraft([item(1), item(2, { itemProviderId: 8 })]);
+
+      draft.apply(code({ group: 1 }));
+
+      expect(draft.apply(code({ group: 1, ...L1 }))).toMatchObject({ merged: true, providerChoice: true });
+    });
+
+    it("tells no choice when the other provider's line is complete (catches: complete lines counted)", () => {
+      const draft = createReceiptDraft([item(1), item(2, { itemProviderId: 8, itemDeliveredQuantity: 6 })]);
+
+      expect(draft.apply(code())).toMatchObject({ kind: "added", orderItemId: 1, providerChoice: false });
+    });
+  });
+
   describe("two codes of one box", () => {
     it("counts an EAN then a GS1 of the same group as 1 unit with the GS1's batch (catches: each code counts)", () => {
       const draft = createReceiptDraft([item(1)]);
       const group = 1;
       draft.apply(code({ group }));
 
-      expect(draft.apply(code({ group, ...L1 }))).toEqual({ kind: "added", orderItemId: 1, ...L1, merged: true });
+      expect(draft.apply(code({ group, ...L1 }))).toEqual({ kind: "added", orderItemId: 1, ...L1, merged: true, providerChoice: false });
       expect(batchesOf(draft, 1)).toEqual([{ quantity: 1, ...L1 }]);
     });
 

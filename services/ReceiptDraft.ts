@@ -18,7 +18,14 @@ export type DraftBatch = { quantity: number; batchNumber?: string; expirationDat
 export type DraftLine = { item: OrderItem; deliveredAtStart: number; batches: DraftBatch[]; correctedPrice?: number };
 
 export type ScanOutcome =
-  | { kind: "added"; orderItemId: number; batchNumber?: string; expirationDate?: string; merged: boolean }
+  | {
+      kind: "added";
+      orderItemId: number;
+      batchNumber?: string;
+      expirationDate?: string;
+      merged: boolean;
+      providerChoice: boolean;
+    }
   | { kind: "lineComplete"; orderItemId: number }
   | { kind: "notInOrder" };
 
@@ -49,7 +56,7 @@ export type ReceiptDraft = {
   setMarks: (changes: Partial<DraftMarks>) => void;
 };
 
-type LastUnit = { group: number; orderItemId: number; identity: BatchIdentity };
+type LastUnit = { group: number; orderItemId: number; identity: BatchIdentity; providerChoice: boolean };
 
 // A GS1 code carries a GTIN-14, the line may carry the EAN-13 of the same product.
 const withoutLeadingZeros = (gtin: string) => gtin.replace(/^0+/, "");
@@ -83,7 +90,7 @@ const freshLine = (item: OrderItem): DraftLine => ({
 
 const byOrderItemId = (a: OrderItem, b: OrderItem) => a.orderItemId - b.orderItemId;
 
-const draftQuantity = (line: DraftLine) =>
+export const draftQuantity = (line: DraftLine) =>
   line.batches.reduce((sum, batch) => sum + Math.max(0, batch.quantity), 0);
 
 const isComplete = (line: DraftLine) => line.deliveredAtStart + draftQuantity(line) >= line.item.itemQuantity;
@@ -141,7 +148,7 @@ export function createReceiptDraft(items: readonly OrderItem[]): ReceiptDraft {
     if (!lastUnit || lastUnit.group !== code.group || !(isBare(lastUnit.identity) || isBare(identity))) {
       return null;
     }
-    const { orderItemId, identity: counted } = lastUnit;
+    const { orderItemId, identity: counted, providerChoice } = lastUnit;
     const line = lineOf(orderItemId);
     if (!matchesGtin(line, code.gtin) && !matchesProduct(line, code.productIds)) {
       return null;
@@ -150,7 +157,7 @@ export function createReceiptDraft(items: readonly OrderItem[]): ReceiptDraft {
     takeUnit(line, counted);
     addUnit(line, target);
     lastUnit = null;
-    return { kind: "added", orderItemId, ...target, merged: true };
+    return { kind: "added", orderItemId, ...target, merged: true, providerChoice };
   };
 
   return {
@@ -163,11 +170,14 @@ export function createReceiptDraft(items: readonly OrderItem[]): ReceiptDraft {
 
       const byGtin = lines.filter((line) => matchesGtin(line, code.gtin));
       const byProduct = lines.filter((line) => matchesProduct(line, code.productIds));
-      const chosen = byGtin.find((line) => !isComplete(line)) ?? byProduct.find((line) => !isComplete(line));
+      const openByGtin = byGtin.filter((line) => !isComplete(line));
+      const candidates = openByGtin.length > 0 ? openByGtin : byProduct.filter((line) => !isComplete(line));
+      const chosen = candidates[0];
       if (chosen) {
+        const providerChoice = candidates.some((line) => line.item.itemProviderId !== chosen.item.itemProviderId);
         addUnit(chosen, identity);
-        lastUnit = { group: code.group, orderItemId: chosen.item.orderItemId, identity };
-        return { kind: "added", orderItemId: chosen.item.orderItemId, ...identity, merged: false };
+        lastUnit = { group: code.group, orderItemId: chosen.item.orderItemId, identity, providerChoice };
+        return { kind: "added", orderItemId: chosen.item.orderItemId, ...identity, merged: false, providerChoice };
       }
       const matched = byGtin[0] ?? byProduct[0];
       return matched ? { kind: "lineComplete", orderItemId: matched.item.orderItemId } : { kind: "notInOrder" };

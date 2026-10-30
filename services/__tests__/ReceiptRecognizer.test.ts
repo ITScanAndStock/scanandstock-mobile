@@ -54,6 +54,7 @@ describe("ReceiptRecognizer.recognize", () => {
       batchNumber: "12345",
       expirationDate: "31-03-2028",
       merged: false,
+      providerChoice: false,
     });
     expect(mockedApi.get).toHaveBeenCalledWith("/product/decode", { params: { code: GS1_CODE } });
     expect(scanCalls()).toHaveLength(0);

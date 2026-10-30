@@ -14,7 +14,6 @@ import type { Ref } from "react";
 import {
   Alert,
   BackHandler,
-  Button,
   Pressable,
   StyleSheet,
   Text,
@@ -25,16 +24,15 @@ import {
 // import expo
 import {
   BarcodeScanningResult,
-  BarcodeType,
   CameraView,
   useCameraPermissions,
 } from "expo-camera";
-import { useAudioPlayer } from "expo-audio";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // import components
 import CloseIcon from "../assets/images/figma/close.svg";
 import InformationBanner from "@/components/ui-components/InformationBanner";
+import { BARCODE_SCANNER_SETTINGS } from "@/constants/barcodes";
 import { colors } from "@/constants/colors";
 import { useAccount } from "@/context/AccountContext";
 import { AxiosErrorType } from "@/model/ApiError";
@@ -44,9 +42,12 @@ import ToastService from "@/services/ToastService";
 import HeaderStore from "@/state/HeaderStore";
 import RememberedBatchStore from "@/state/RememberedBatchStore";
 import BatchSheet from "./BatchSheet";
+import CameraPermissionRequest from "./CameraPermissionRequest";
 import MouvementButton from "./MouvementButton";
 import ScanBadge from "./ScanBadge";
 import ScanLoader from "./ScanLoader";
+import Viewfinder from "./Viewfinder";
+import { useScanSounds } from "../hooks/useScanSounds";
 import { useStats } from "../hooks/useStats";
 import { Method } from "../model/Stock";
 import ProductService from "../services/ProductService";
@@ -54,8 +55,6 @@ import { movementDirection } from "../services/MovementDirection";
 import { BatchChoiceFeedback, createBatchChoice } from "../services/BatchChoice";
 import { createScanGate } from "../services/ScanGate";
 
-const audioSourceSucces = require("../assets/sounds/ok.mp3");
-const audioSourceError = require("../assets/sounds/error.mp3");
 const INITIAL_METHOD = Method.decrease;
 const BANNER_DURATION_MS = 5000;
 const OVERLAY_CARD_MAX_WIDTH = 560;
@@ -78,27 +77,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
   const insets = useSafeAreaInsets();
   const [scanGate] = useState(createScanGate);
 
-  const playerSuccess = useAudioPlayer(audioSourceSucces);
-  const playerError = useAudioPlayer(audioSourceError);
-
-  const typeOfAcceptScan: BarcodeType[] = useMemo(
-    () => [
-      "qr",
-      "aztec",
-      "codabar",
-      "code128",
-      "code39",
-      "code93",
-      "datamatrix",
-      "ean13",
-      "ean8",
-      "itf14",
-      "pdf417",
-      "upc_a",
-      "upc_e",
-    ],
-    [],
-  );
+  const sounds = useScanSounds();
 
   const { refresh: refreshStats, stats } = useStats();
   const [method, setMethod] = useState(INITIAL_METHOD);
@@ -132,17 +111,15 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
         ToastService.success(message.split("<br/>")[0], "Succès");
         refreshStats();
         Vibration.vibrate(100);
-        playerSuccess.seekTo(0);
-        playerSuccess.play();
+        sounds.success();
       },
       onFailed: (...toast) => {
         ToastService.error(...toast);
         Vibration.vibrate(100);
-        playerError.seekTo(0);
-        playerError.play();
+        sounds.error();
       },
     }),
-    [refreshStats, playerSuccess, playerError],
+    [refreshStats, sounds],
   );
 
   const lastScan = stats && stats.length > 0 ? stats[0] : null;
@@ -214,10 +191,10 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
     }
     if (connected) {
       scanGate.badgeConnected(data, Date.now());
+      sounds.success();
+    } else {
+      sounds.error();
     }
-    const player = connected ? playerSuccess : playerError;
-    player.seekTo(0);
-    player.play();
 
     // close() already released the lock; after a reopen it belongs to the new connection.
     if (!activeRef.current || openCountRef.current !== openCount) return;
@@ -252,8 +229,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
           .then(() => {
             scanGate.sendFinished(true);
             refreshStats();
-            playerSuccess.seekTo(0);
-            playerSuccess.play();
+            sounds.success();
           })
           .catch((error: AxiosErrorType) => {
             if (__DEV__) {
@@ -295,8 +271,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
               }
             } else {
               scanGate.sendFinished(false);
-              playerError.seekTo(0);
-              playerError.play();
+              sounds.error();
             }
           })
           .finally(() => {
@@ -306,14 +281,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
 
       sendScan(false);
     },
-    [scanGate, batchChoice, batchFeedback, method, refreshStats, playerSuccess, playerError, scanSent],
-  );
-
-  const barcodeScannerSettings = useMemo(
-    () => ({
-      barcodeTypes: typeOfAcceptScan,
-    }),
-    [typeOfAcceptScan],
+    [scanGate, batchChoice, batchFeedback, method, refreshStats, sounds, scanSent],
   );
 
   const handleScan = ({ data }: BarcodeScanningResult) => {
@@ -365,19 +333,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
 
   if (!permission.granted) {
     return (
-      <View
-        style={styles.container}
-        accessible={true}
-        accessibilityLabel="Permission de la caméra requise"
-      >
-        <Text style={styles.message} accessible={true} accessibilityRole="text">
-          Nous avons besoins de votre permission pour utiliser la caméra
-        </Text>
-        <Button
-          onPress={requestPermission}
-          title="Autoriser la caméra"
-          accessibilityLabel="Autoriser la caméra"
-        />
+      <CameraPermissionRequest onRequest={requestPermission}>
         <Pressable
           style={[styles.closeBtn, styles.permissionCloseBtn, { bottom: 16 + insets.bottom }]}
           onPress={onClose}
@@ -387,7 +343,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
         >
           <CloseIcon width={22} height={22} accessible={false} />
         </Pressable>
-      </View>
+      </CameraPermissionRequest>
     );
   }
 
@@ -398,7 +354,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
         active={active}
         style={styles.camera}
         onCameraReady={handleCameraReady}
-        barcodeScannerSettings={barcodeScannerSettings}
+        barcodeScannerSettings={BARCODE_SCANNER_SETTINGS}
         onBarcodeScanned={handleScan}
       />
 
@@ -423,12 +379,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
           </View>
         ) : null}
 
-        <View style={styles.viewfinder} pointerEvents="none">
-          <View style={[styles.corner, styles.cornerTL]} />
-          <View style={[styles.corner, styles.cornerTR]} />
-          <View style={[styles.corner, styles.cornerBL]} />
-          <View style={[styles.corner, styles.cornerBR]} />
-        </View>
+        <Viewfinder />
 
         <View style={styles.bottomBlock}>
           {lastScan && lastScanDirection ? (
@@ -500,11 +451,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.DARK,
     justifyContent: "center",
   },
-  message: {
-    textAlign: "center",
-    paddingBottom: 10,
-    color: colors.WHITE,
-  },
   camera: {
     ...StyleSheet.absoluteFill,
   },
@@ -546,46 +492,6 @@ const styles = StyleSheet.create({
   bannerCard: {
     width: "100%",
     maxWidth: OVERLAY_CARD_MAX_WIDTH,
-  },
-  viewfinder: {
-    alignSelf: "center",
-    width: 280,
-    height: 200,
-    position: "relative",
-  },
-  corner: {
-    position: "absolute",
-    width: 38,
-    height: 38,
-    borderColor: colors.WHITE,
-  },
-  cornerTL: {
-    top: 0,
-    left: 0,
-    borderTopWidth: 4,
-    borderLeftWidth: 4,
-    borderTopLeftRadius: 14,
-  },
-  cornerTR: {
-    top: 0,
-    right: 0,
-    borderTopWidth: 4,
-    borderRightWidth: 4,
-    borderTopRightRadius: 14,
-  },
-  cornerBL: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: 4,
-    borderLeftWidth: 4,
-    borderBottomLeftRadius: 14,
-  },
-  cornerBR: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: 4,
-    borderRightWidth: 4,
-    borderBottomRightRadius: 14,
   },
   bottomBlock: {
     gap: 12,

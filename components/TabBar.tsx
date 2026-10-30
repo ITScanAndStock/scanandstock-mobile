@@ -6,7 +6,7 @@ import type { SvgProps } from "react-native-svg";
 
 import { colors } from "../constants/colors";
 import { isTablet } from "../constants/layout";
-import { useScanCamera } from "../context/ScanCameraContext";
+import { useNavigationHidden } from "../context/ScanCameraContext";
 import { ActiveNavigationEntry, NavigationEntry } from "../services/NavigationEntries";
 
 const TAB_BAR_CONTENT_HEIGHT = 50;
@@ -42,14 +42,14 @@ export function useScreenBottomInset() {
 }
 
 export default function TabBar({ state, navigation, insets, entries, icons }: TabBarProps) {
-  const { isCameraOpen, homeOpacity } = useScanCamera();
+  const { hidden, opacity } = useNavigationHidden();
 
   return (
     <Animated.View
-      style={[styles.bar, { height: TAB_BAR_CONTENT_HEIGHT + insets.bottom, opacity: homeOpacity }]}
-      pointerEvents={isCameraOpen ? "none" : "auto"}
-      importantForAccessibility={isCameraOpen ? "no-hide-descendants" : "auto"}
-      accessibilityElementsHidden={isCameraOpen}
+      style={[styles.bar, { height: TAB_BAR_CONTENT_HEIGHT + insets.bottom, opacity }]}
+      pointerEvents={hidden ? "none" : "auto"}
+      importantForAccessibility={hidden ? "no-hide-descendants" : "auto"}
+      accessibilityElementsHidden={hidden}
       accessibilityRole="tablist"
     >
       {entries.map((entry) => {

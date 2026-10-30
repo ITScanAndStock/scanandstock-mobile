@@ -17,7 +17,7 @@ import LogoutIcon from "../assets/images/figma/logout.svg";
 import { colors } from "../constants/colors";
 import { isTablet } from "../constants/layout";
 import { useAccount } from "../context/AccountContext";
-import { useScanCamera } from "../context/ScanCameraContext";
+import { useNavigationHidden } from "../context/ScanCameraContext";
 import { useIsLandscape } from "../hooks/useIsLandscape";
 import { useLogout } from "../hooks/useLogout";
 import { Account } from "../model/Account";
@@ -46,7 +46,7 @@ export function useScreenLeftInset() {
 }
 
 export default function SideRail({ state, navigation, entries, icons }: SideRailProps) {
-  const { isCameraOpen, homeOpacity } = useScanCamera();
+  const { hidden, opacity } = useNavigationHidden();
   const { accounts, activeAccount, setActiveAccount } = useAccount();
   const handleLogout = useLogout();
   const insets = useSafeAreaInsets();
@@ -74,12 +74,12 @@ export default function SideRail({ state, navigation, entries, icons }: SideRail
           paddingTop: metrics.paddingTop,
           paddingBottom,
           gap: metrics.gap,
-          opacity: homeOpacity,
+          opacity,
         },
       ]}
-      pointerEvents={isCameraOpen ? "none" : "auto"}
-      importantForAccessibility={isCameraOpen ? "no-hide-descendants" : "auto"}
-      accessibilityElementsHidden={isCameraOpen}
+      pointerEvents={hidden ? "none" : "auto"}
+      importantForAccessibility={hidden ? "no-hide-descendants" : "auto"}
+      accessibilityElementsHidden={hidden}
     >
       <Image
         source={require("../assets/images/logo-white.png")}
