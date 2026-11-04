@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BarcodeBounds } from "expo-camera";
-import { createCameraControls } from "../CameraControls";
+import { type CameraControls, createCameraControls, PINCH_ZOOM_GAIN } from "../CameraControls";
 
 const FRAME = { x: 50, y: 100, width: 280, height: 200 };
 
@@ -184,5 +184,172 @@ describe("CameraControls torch", () => {
     controls.closed();
     controls.opened();
     expect(controls.accepts(bounds(170, 180, 40, 40))).toBe(true);
+  });
+});
+
+function pinched(controls: CameraControls, scale: number) {
+  controls.pinchStarted();
+  controls.pinchChanged(scale);
+}
+
+function zoomedTo(controls: CameraControls, zoom: number) {
+  controls.pinchStarted();
+  controls.pinchChanged(1 + zoom / PINCH_ZOOM_GAIN);
+}
+
+describe("CameraControls zoom", () => {
+  it("starts without zoom (catches: zoom initially above 0)", () => {
+    expect(createCameraControls().getState()).toMatchObject({ zoom: 0, zoomed: false });
+  });
+
+  it("opened() drops a zoom while the torch is lit (catches: zoom kept by opened())", () => {
+    const controls = createCameraControls();
+    controls.toggleTorch();
+    zoomedTo(controls, 0.3);
+    controls.opened();
+    expect(controls.getState()).toEqual({ torch: false, zoom: 0, zoomed: false });
+  });
+
+  it("closed() drops a zoom while the torch is lit (catches: zoom kept by closed())", () => {
+    const controls = createCameraControls();
+    controls.toggleTorch();
+    zoomedTo(controls, 0.3);
+    controls.closed();
+    expect(controls.getState()).toEqual({ torch: false, zoom: 0, zoomed: false });
+  });
+
+  it("keeps the torch when only the zoom changes (catches: torch reset by a pinch)", () => {
+    const controls = createCameraControls();
+    controls.toggleTorch();
+    zoomedTo(controls, 0.3);
+    expect(controls.getState().torch).toBe(true);
+  });
+
+  it("keeps the zoom when only the torch toggles (catches: zoom reset by toggleTorch)", () => {
+    const controls = createCameraControls();
+    zoomedTo(controls, 0.3);
+    controls.toggleTorch();
+    expect(controls.getState().zoom).toBeCloseTo(0.3);
+  });
+
+  it("a pinch of scale 1 right after a start leaves the zoom unchanged (catches: scale added instead of its gap to 1)", () => {
+    const controls = createCameraControls();
+    zoomedTo(controls, 0.3);
+    pinched(controls, 1);
+    expect(controls.getState().zoom).toBeCloseTo(0.3);
+  });
+
+  it("a second pinch starts from the zoom the first one left (catches: start taken as 0 at each gesture)", () => {
+    const controls = createCameraControls();
+    zoomedTo(controls, 0.3);
+    pinched(controls, 1 + 0.2 / PINCH_ZOOM_GAIN);
+    expect(controls.getState().zoom).toBeCloseTo(0.5);
+  });
+
+  it("follows scale during one gesture from the same start (catches: start moved on each change)", () => {
+    const controls = createCameraControls();
+    zoomedTo(controls, 0.3);
+    controls.pinchStarted();
+    controls.pinchChanged(1 + 0.1 / PINCH_ZOOM_GAIN);
+    controls.pinchChanged(1 + 0.2 / PINCH_ZOOM_GAIN);
+    expect(controls.getState().zoom).toBeCloseTo(0.5);
+  });
+
+  it("clamps a very wide pinch to 1 (catches: upper bound removed)", () => {
+    const controls = createCameraControls();
+    pinched(controls, 100);
+    expect(controls.getState().zoom).toBe(1);
+  });
+
+  it("clamps a very narrow pinch to 0 (catches: lower bound removed)", () => {
+    const controls = createCameraControls();
+    zoomedTo(controls, 0.3);
+    pinched(controls, 0);
+    expect(controls.getState()).toMatchObject({ zoom: 0, zoomed: false });
+  });
+
+  it("zoomed is true above 0 (catches: zoomed never true)", () => {
+    const controls = createCameraControls();
+    zoomedTo(controls, 0.3);
+    expect(controls.getState().zoomed).toBe(true);
+  });
+
+  it("zooms by half the range for a pinch doubling the distance (catches: pinch gain changed)", () => {
+    const controls = createCameraControls();
+    pinched(controls, 2);
+    expect(controls.getState().zoom).toBeCloseTo(0.5);
+  });
+
+  it("ignores a law result that is not a finite number (catches: NaN zoom sent to the camera)", () => {
+    const controls = createCameraControls({ zoomLaw: () => Number.NaN });
+    const before = controls.getState();
+    pinched(controls, 2);
+    expect(controls.getState()).toBe(before);
+  });
+
+  it("resetZoom() brings zoom to 0 and zoomed to false, keeping the torch (catches: resetZoom without effect on zoom)", () => {
+    const controls = createCameraControls();
+    controls.toggleTorch();
+    zoomedTo(controls, 0.3);
+    controls.resetZoom();
+    expect(controls.getState()).toEqual({ torch: true, zoom: 0, zoomed: false });
+  });
+
+  it("uses the law given as an option (catches: option ignored, default law always used)", () => {
+    const controls = createCameraControls({ zoomLaw: (start, scale) => start + scale / 10 });
+    pinched(controls, 3);
+    expect(controls.getState().zoom).toBeCloseTo(0.3);
+  });
+
+  it("clamps what a custom law returns (catches: clamp applied to the default law only)", () => {
+    const controls = createCameraControls({ zoomLaw: () => 7 });
+    pinched(controls, 2);
+    expect(controls.getState().zoom).toBe(1);
+  });
+
+  it("notifies a subscriber on pinchChanged (catches: notification removed from pinchChanged)", () => {
+    const controls = createCameraControls();
+    controls.pinchStarted();
+    let calls = 0;
+    controls.subscribe(() => calls++);
+    controls.pinchChanged(2);
+    expect(calls).toBe(1);
+  });
+
+  it("notifies a subscriber on resetZoom (catches: notification removed from resetZoom)", () => {
+    const controls = createCameraControls();
+    zoomedTo(controls, 0.3);
+    let calls = 0;
+    controls.subscribe(() => calls++);
+    controls.resetZoom();
+    expect(calls).toBe(1);
+  });
+
+  it("notifies a subscriber on opened() with only a zoom to drop (catches: opened() notifying on the torch only)", () => {
+    const controls = createCameraControls();
+    zoomedTo(controls, 0.3);
+    let calls = 0;
+    controls.subscribe(() => calls++);
+    controls.opened();
+    expect(calls).toBe(1);
+  });
+
+  it("returns the same state object and stays silent when pinchChanged(1) changes nothing (catches: new state without a change)", () => {
+    const controls = createCameraControls();
+    zoomedTo(controls, 0.3);
+    const before = controls.getState();
+    let calls = 0;
+    controls.subscribe(() => calls++);
+    pinched(controls, 1);
+    expect(controls.getState()).toBe(before);
+    expect(calls).toBe(0);
+  });
+
+  it("returns a new state object after a zoom change (catches: state mutated in place)", () => {
+    const controls = createCameraControls();
+    const before = controls.getState();
+    pinched(controls, 2);
+    expect(controls.getState()).not.toBe(before);
+    expect(before.zoom).toBe(0);
   });
 });

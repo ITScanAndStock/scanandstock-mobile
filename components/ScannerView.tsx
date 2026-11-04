@@ -27,6 +27,7 @@ import {
   CameraView,
   useCameraPermissions,
 } from "expo-camera";
+import { GestureDetector } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // import components
@@ -46,8 +47,10 @@ import CameraPermissionRequest from "./CameraPermissionRequest";
 import MouvementButton from "./MouvementButton";
 import ScanBadge from "./ScanBadge";
 import ScanLoader from "./ScanLoader";
-import TorchButton, { ROUND_BUTTON } from "./TorchButton";
+import { ROUND_BUTTON } from "./RoundButton";
+import TorchButton from "./TorchButton";
 import Viewfinder from "./Viewfinder";
+import ZoomResetButton from "./ZoomResetButton";
 import { useCameraControls } from "../hooks/useCameraControls";
 import { useScanSounds } from "../hooks/useScanSounds";
 import { useStats } from "../hooks/useStats";
@@ -356,15 +359,18 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
 
   return (
     <View style={styles.container}>
-      <CameraView
-        ref={cameraRef}
-        active={active}
-        enableTorch={cameraControls.torch}
-        style={styles.camera}
-        onCameraReady={handleCameraReady}
-        barcodeScannerSettings={BARCODE_SCANNER_SETTINGS}
-        onBarcodeScanned={handleScan}
-      />
+      <GestureDetector gesture={cameraControls.pinch}>
+        <CameraView
+          ref={cameraRef}
+          active={active}
+          enableTorch={cameraControls.torch}
+          zoom={cameraControls.zoom}
+          style={styles.camera}
+          onCameraReady={handleCameraReady}
+          barcodeScannerSettings={BARCODE_SCANNER_SETTINGS}
+          onBarcodeScanned={handleScan}
+        />
+      </GestureDetector>
 
       <View
         style={[styles.overlay, { paddingBottom: 16 + insets.bottom }]}
@@ -423,6 +429,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
           <View style={styles.controlsRow}>
             <MouvementButton method={method} setMethod={handleMethodChange} />
             <TorchButton on={cameraControls.torch} onPress={cameraControls.toggleTorch} />
+            {cameraControls.zoomed ? <ZoomResetButton onPress={cameraControls.resetZoom} /> : null}
             <Pressable
               style={styles.closeBtn}
               onPress={onClose}
