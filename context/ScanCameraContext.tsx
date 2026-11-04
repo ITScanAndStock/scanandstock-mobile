@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { Animated } from "react-native";
+import { Animated, StyleSheet } from "react-native";
 
 import { type CameraTurn, computeCameraTurn } from "@/services/CameraTurn";
 
@@ -72,5 +72,12 @@ export function useCameraMounted(owner: CameraOwner) {
 
 export function useNavigationHidden() {
   const { isCameraOpen, isReceiptOpen, homeOpacity } = useScanCamera();
-  return { hidden: isCameraOpen || isReceiptOpen, opacity: isReceiptOpen ? 0 : homeOpacity };
+  // Once the native driver has animated the opacity, Android ignores a plain value put in its place: a receipt removes the bar instead.
+  return { hidden: isCameraOpen || isReceiptOpen, style: [{ opacity: homeOpacity }, isReceiptOpen && navigationStyles.removed] };
 }
+
+const navigationStyles = StyleSheet.create({
+  removed: {
+    display: "none",
+  },
+});

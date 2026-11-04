@@ -342,7 +342,7 @@ function ReceiptSession({ order, items, saved, onLeave, onAccountChanged }: Rece
         )}
         contentContainerStyle={styles.lines}
       />
-      <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
+      <View style={[styles.footer, { paddingBottom: 20 + insets.bottom }]}>
         <PrimaryButton
           label={sending ? "Envoi en cours…" : `Réceptionner ${plural(scanned, "produit")}`}
           onPress={() => requestSend(false)}
@@ -380,7 +380,7 @@ function ReceiptLayout({ order, onLeave, camera, banner, overlay, header, childr
             <CloseIcon width={22} height={22} accessible={false} />
           </Pressable>
           <View style={styles.titlePill}>
-            <Text style={styles.titleText} numberOfLines={1} accessibilityRole="header">
+            <Text style={styles.titleText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} accessibilityRole="header">
               Réception · commande du {formatOrderDate(order.orderDate)}
             </Text>
           </View>
@@ -487,6 +487,8 @@ const styles = StyleSheet.create({
   },
   sheetHeader: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    columnGap: 12,
     justifyContent: "space-between",
     alignItems: "baseline",
     marginBottom: 8,

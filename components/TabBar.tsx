@@ -42,11 +42,11 @@ export function useScreenBottomInset() {
 }
 
 export default function TabBar({ state, navigation, insets, entries, icons }: TabBarProps) {
-  const { hidden, opacity } = useNavigationHidden();
+  const { hidden, style } = useNavigationHidden();
 
   return (
     <Animated.View
-      style={[styles.bar, { height: TAB_BAR_CONTENT_HEIGHT + insets.bottom, opacity }]}
+      style={[styles.bar, { height: TAB_BAR_CONTENT_HEIGHT + insets.bottom }, style]}
       pointerEvents={hidden ? "none" : "auto"}
       importantForAccessibility={hidden ? "no-hide-descendants" : "auto"}
       accessibilityElementsHidden={hidden}

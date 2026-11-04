@@ -17,11 +17,11 @@ export default function ReceiptScanCard({ banner, style }: { banner: ReceiptBann
         <Text style={[styles.mark, { color: tone.color }]}>{tone.mark}</Text>
       </View>
       <View style={styles.text}>
-        <Text style={receiptTextStyles.designation} numberOfLines={1}>
+        <Text style={receiptTextStyles.designation} numberOfLines={2}>
           {banner.title}
         </Text>
         {banner.detail ? (
-          <Text style={receiptTextStyles.meta} numberOfLines={1}>
+          <Text style={receiptTextStyles.meta} numberOfLines={2}>
             {banner.detail}
           </Text>
         ) : null}

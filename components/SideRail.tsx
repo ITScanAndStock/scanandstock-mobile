@@ -46,7 +46,7 @@ export function useScreenLeftInset() {
 }
 
 export default function SideRail({ state, navigation, entries, icons }: SideRailProps) {
-  const { hidden, opacity } = useNavigationHidden();
+  const { hidden, style } = useNavigationHidden();
   const { accounts, activeAccount, setActiveAccount } = useAccount();
   const handleLogout = useLogout();
   const insets = useSafeAreaInsets();
@@ -74,8 +74,8 @@ export default function SideRail({ state, navigation, entries, icons }: SideRail
           paddingTop: metrics.paddingTop,
           paddingBottom,
           gap: metrics.gap,
-          opacity,
         },
+        style,
       ]}
       pointerEvents={hidden ? "none" : "auto"}
       importantForAccessibility={hidden ? "no-hide-descendants" : "auto"}
