@@ -4,6 +4,7 @@ import { type BarcodeScanningResult, CameraView, useCameraPermissions } from "ex
 import { BARCODE_SCANNER_SETTINGS } from "../constants/barcodes";
 import { colors } from "../constants/colors";
 import { useCameraMounted } from "../context/ScanCameraContext";
+import { useCameraControls } from "../hooks/useCameraControls";
 import CameraPermissionRequest from "./CameraPermissionRequest";
 import Viewfinder from "./Viewfinder";
 
@@ -11,6 +12,7 @@ type ReceiptCameraProps = { onScanned: (result: BarcodeScanningResult) => void }
 
 export default function ReceiptCamera({ onScanned }: ReceiptCameraProps) {
   const [permission, requestPermission] = useCameraPermissions();
+  const cameraControls = useCameraControls();
 
   if (!permission) {
     return <View style={styles.container} />;
@@ -20,8 +22,15 @@ export default function ReceiptCamera({ onScanned }: ReceiptCameraProps) {
   }
   return (
     <View style={styles.container}>
-      <MountedCamera onScanned={onScanned} />
-      <Viewfinder style={styles.viewfinder} />
+      <MountedCamera
+        onScanned={(result) => {
+          if (cameraControls.accepts(result.bounds)) onScanned(result);
+        }}
+      />
+      <Viewfinder
+        style={styles.viewfinder}
+        onLayout={cameraControls.onFrameLayout}
+      />
     </View>
   );
 }
