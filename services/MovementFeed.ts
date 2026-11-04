@@ -1,6 +1,9 @@
 import type { StatsModel } from "../model/Stats";
 import { AccountChangedError } from "./AccountResponse";
 
+// The API writes a movement after answering the write: the reload right after it may not see it yet.
+const LATER_RELOAD_AFTER_WRITE_MS = 2000;
+
 export type MovementLoading = "first" | "reload" | "nextPage" | null;
 
 export type MovementFeedState = {
@@ -10,6 +13,7 @@ export type MovementFeedState = {
   firstLoadFailed: boolean;
   nextPageFailed: boolean;
   pulling: boolean;
+  backToTop: number;
 };
 
 export type MovementSession = {
@@ -30,6 +34,7 @@ const EMPTY: MovementFeedState = {
   firstLoadFailed: false,
   nextPageFailed: false,
   pulling: false,
+  backToTop: 0,
 };
 
 // A movement written between two pages shifts the rest by one: the last movement seen comes back.
@@ -46,6 +51,7 @@ export function createMovementFeed({ loadPage, pageSize, onPullFailed }: Movemen
   // Movements received since the last reload, not movements shown: a page of duplicates would ask the same page again.
   let received = 0;
   let pageReceived = false;
+  let laterReload: ReturnType<typeof setTimeout> | null = null;
   const listeners = new Set<() => void>();
 
   const update = (changes: Partial<MovementFeedState>) => {
@@ -80,7 +86,15 @@ export function createMovementFeed({ loadPage, pageSize, onPullFailed }: Movemen
     );
   };
 
+  const cancelLaterReload = () => {
+    if (laterReload !== null) {
+      clearTimeout(laterReload);
+      laterReload = null;
+    }
+  };
+
   const reload = (account: string, fromPull = false) => {
+    cancelLaterReload();
     generation += 1;
     update({ loading: state.movements.length > 0 ? "reload" : "first", pulling: fromPull });
     request(
@@ -104,6 +118,11 @@ export function createMovementFeed({ loadPage, pageSize, onPullFailed }: Movemen
         }
       },
     );
+  };
+
+  const reloadToTop = (account: string) => {
+    reload(account);
+    update({ backToTop: state.backToTop + 1 });
   };
 
   const nextPage = (account: string) => {
@@ -137,10 +156,11 @@ export function createMovementFeed({ loadPage, pageSize, onPullFailed }: Movemen
         return;
       }
       accountId = next;
+      cancelLaterReload();
       generation += 1;
       received = 0;
       pageReceived = false;
-      update(EMPTY);
+      update({ ...EMPTY, backToTop: state.backToTop });
       if (next !== null) {
         reload(next);
       }
@@ -167,9 +187,15 @@ export function createMovementFeed({ loadPage, pageSize, onPullFailed }: Movemen
       }
     },
     afterWrite: () => {
-      if (accountId !== null) {
-        reload(accountId);
+      if (accountId === null) {
+        return;
       }
+      const account = accountId;
+      reloadToTop(account);
+      laterReload = setTimeout(() => {
+        laterReload = null;
+        reloadToTop(account);
+      }, LATER_RELOAD_AFTER_WRITE_MS);
     },
   };
 }

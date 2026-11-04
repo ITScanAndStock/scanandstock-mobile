@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { StatsModel } from "../../model/Stats";
 import { AccountChangedError } from "../AccountResponse";
 import { createMovementFeed } from "../MovementFeed";
@@ -43,6 +43,10 @@ async function withFirstPage(page: StatsModel[] = range(1, 20)) {
 }
 
 describe("MovementFeed", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("asks the next page from 20 after a full first page (catches: offset fixed at 0)", async () => {
     const { feed, calls } = await withFirstPage();
 
@@ -462,5 +466,75 @@ describe("MovementFeed", () => {
     feed.afterWrite();
 
     expect(feed.getState().loading).toBe("first");
+  });
+
+  it("reloads after a write now and once more 2 s later, twice in all at 10 s, back to the top each time (catches: no later reload; later reload repeating; counter not raised)", async () => {
+    const { feed, loadPage } = await withFirstPage();
+    vi.useFakeTimers();
+    const before = loadPage.mock.calls.length;
+
+    feed.afterWrite();
+    expect(loadPage.mock.calls.slice(before)).toEqual([["12", 0]]);
+    expect(feed.getState().backToTop).toBe(1);
+    vi.advanceTimersByTime(1999);
+    expect(loadPage).toHaveBeenCalledTimes(before + 1);
+    vi.advanceTimersByTime(1);
+    expect(loadPage.mock.calls.slice(before)).toEqual([["12", 0], ["12", 0]]);
+    expect(feed.getState().backToTop).toBe(2);
+    vi.advanceTimersByTime(8000);
+
+    expect(loadPage).toHaveBeenCalledTimes(before + 2);
+  });
+
+  it("drops the later reload of a write when a pull comes before it (catches: later reload not cancelled by a pull)", async () => {
+    const { feed, loadPage } = await withFirstPage();
+    vi.useFakeTimers();
+    const before = loadPage.mock.calls.length;
+
+    feed.afterWrite();
+    vi.advanceTimersByTime(1000);
+    feed.pull();
+    vi.advanceTimersByTime(9000);
+
+    expect(loadPage).toHaveBeenCalledTimes(before + 2);
+  });
+
+  it("drops the later reload of a write at a logout (catches: later reload not cancelled by the session)", async () => {
+    const { feed, loadPage } = await withFirstPage();
+    vi.useFakeTimers();
+    const before = loadPage.mock.calls.length;
+
+    feed.afterWrite();
+    vi.advanceTimersByTime(1000);
+    feed.setSession({ accountId: "12", connected: false });
+    vi.advanceTimersByTime(9000);
+
+    expect(loadPage).toHaveBeenCalledTimes(before + 1);
+  });
+
+  it("drops the later reload of a write at an account change (catches: later reload cancelled neither by the session nor by the new account's first load)", async () => {
+    const { feed, loadPage } = await withFirstPage();
+    vi.useFakeTimers();
+    const before = loadPage.mock.calls.length;
+
+    feed.afterWrite();
+    vi.advanceTimersByTime(1000);
+    feed.setSession({ accountId: "13", connected: true });
+    vi.advanceTimersByTime(9000);
+
+    expect(loadPage.mock.calls.slice(before)).toEqual([["12", 0], ["13", 0]]);
+  });
+
+  it("keeps only the later reload of the last write, three reloads in all for two writes (catches: later reload of a write not cancelled by the next one)", async () => {
+    const { feed, loadPage } = await withFirstPage();
+    vi.useFakeTimers();
+    const before = loadPage.mock.calls.length;
+
+    feed.afterWrite();
+    vi.advanceTimersByTime(1000);
+    feed.afterWrite();
+    vi.advanceTimersByTime(9000);
+
+    expect(loadPage).toHaveBeenCalledTimes(before + 3);
   });
 });

@@ -27,6 +27,7 @@ import { colors } from "@/constants/colors";
 import { isTablet } from "@/constants/layout";
 import { useCameraMounted, useScanCamera } from "@/context/ScanCameraContext";
 import { useStats } from "@/hooks/useStats";
+import type { StatsModel } from "@/model/Stats";
 
 const PHONE_VISIBLE_MOVEMENTS = 3;
 const TABLET_PORTRAIT_VISIBLE_MOVEMENTS = 5;
@@ -34,12 +35,14 @@ const OPEN_DURATION_MS = 500;
 const CLOSE_DURATION_MS = 400;
 
 export default function Scan() {
-  const { movements, loading, firstLoadFailed, nextPageFailed, pulling, pull, loadNextPage, retry } = useStats();
+  const { movements, loading, firstLoadFailed, nextPageFailed, pulling, backToTop, pull, loadNextPage, retry } =
+    useStats();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   const tablet = isTablet();
   const listHeight = movementsListHeight(tablet, isLandscape);
   const scannerRef = useRef<ScannerViewHandle>(null);
+  const movementsListRef = useRef<FlatList<StatsModel>>(null);
   const { isCameraOpen, setCameraOpen, progress, homeOpacity, cameraTurn } = useScanCamera();
   const bottomInset = useScreenBottomInset();
   const leftInset = useScreenLeftInset();
@@ -71,6 +74,10 @@ export default function Scan() {
     setCameraOpen(false);
     animateTo(0, CLOSE_DURATION_MS);
   }, [animateTo, setCameraOpen]);
+
+  useEffect(() => {
+    movementsListRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [backToTop]);
 
   useEffect(() => {
     if (!isFocused && isCameraOpen) {
@@ -188,6 +195,7 @@ export default function Scan() {
           <View style={listHeight === undefined ? styles.movementsFill : { height: listHeight }}>{movementsState}</View>
         ) : (
           <FlatList
+            ref={movementsListRef}
             data={movements}
             keyExtractor={(item) => String(item.id)}
             renderItem={({ item }) => <MovementRow item={item} />}
