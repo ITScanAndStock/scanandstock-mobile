@@ -27,6 +27,7 @@ import {
   CameraView,
   useCameraPermissions,
 } from "expo-camera";
+import { GestureDetector } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // import components
@@ -46,7 +47,11 @@ import CameraPermissionRequest from "./CameraPermissionRequest";
 import MouvementButton from "./MouvementButton";
 import ScanBadge from "./ScanBadge";
 import ScanLoader from "./ScanLoader";
+import { ROUND_BUTTON } from "./RoundButton";
+import TorchButton from "./TorchButton";
 import Viewfinder from "./Viewfinder";
+import ZoomResetButton from "./ZoomResetButton";
+import { useCameraControls } from "../hooks/useCameraControls";
 import { useScanSounds } from "../hooks/useScanSounds";
 import { useStats } from "../hooks/useStats";
 import { Method } from "../model/Stock";
@@ -76,6 +81,8 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
   const activeRef = useRef(active);
   const insets = useSafeAreaInsets();
   const [scanGate] = useState(createScanGate);
+  const cameraControls = useCameraControls();
+  const { opened: cameraOpened, closed: cameraClosed } = cameraControls;
 
   const sounds = useScanSounds();
 
@@ -148,6 +155,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
         activeRef.current = true;
         openCountRef.current += 1;
         scanGate.cameraReopened();
+        cameraOpened();
         handleMethodChange(INITIAL_METHOD);
         cameraRef.current?.resumePreview();
       },
@@ -155,6 +163,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
         activeRef.current = false;
         batchChoice.cameraClosed();
         scanGate.cameraClosed(Date.now());
+        cameraClosed();
         for (const timer of [bannerTimeoutRef, badgeTimeoutRef]) {
           if (timer.current) {
             clearTimeout(timer.current);
@@ -166,7 +175,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
         cameraRef.current?.pausePreview();
       },
     }),
-    [handleMethodChange, scanGate, batchChoice],
+    [handleMethodChange, scanGate, batchChoice, cameraOpened, cameraClosed],
   );
 
   const handleCameraReady = () => {
@@ -284,7 +293,8 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
     [scanGate, batchChoice, batchFeedback, method, refreshStats, sounds, scanSent],
   );
 
-  const handleScan = ({ data }: BarcodeScanningResult) => {
+  const handleScan = ({ data, bounds }: BarcodeScanningResult) => {
+    if (!cameraControls.accepts(bounds)) return;
     if (!activeRef.current || badgeProcessingRef.current) return;
     if (isTracingEnabled && !isBadgeValid()) {
       if (!scanGate.isBusy()) {
@@ -349,14 +359,18 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
 
   return (
     <View style={styles.container}>
-      <CameraView
-        ref={cameraRef}
-        active={active}
-        style={styles.camera}
-        onCameraReady={handleCameraReady}
-        barcodeScannerSettings={BARCODE_SCANNER_SETTINGS}
-        onBarcodeScanned={handleScan}
-      />
+      <GestureDetector gesture={cameraControls.pinch}>
+        <CameraView
+          ref={cameraRef}
+          active={active}
+          enableTorch={cameraControls.torch}
+          zoom={cameraControls.zoom}
+          style={styles.camera}
+          onCameraReady={handleCameraReady}
+          barcodeScannerSettings={BARCODE_SCANNER_SETTINGS}
+          onBarcodeScanned={handleScan}
+        />
+      </GestureDetector>
 
       <View
         style={[styles.overlay, { paddingBottom: 16 + insets.bottom }]}
@@ -379,7 +393,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
           </View>
         ) : null}
 
-        <Viewfinder />
+        <Viewfinder onLayout={cameraControls.onFrameLayout} />
 
         <View style={styles.bottomBlock}>
           {lastScan && lastScanDirection ? (
@@ -414,6 +428,8 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
 
           <View style={styles.controlsRow}>
             <MouvementButton method={method} setMethod={handleMethodChange} />
+            <TorchButton on={cameraControls.torch} onPress={cameraControls.toggleTorch} />
+            {cameraControls.zoomed ? <ZoomResetButton onPress={cameraControls.resetZoom} /> : null}
             <Pressable
               style={styles.closeBtn}
               onPress={onClose}
@@ -558,11 +574,7 @@ const styles = StyleSheet.create({
     right: 16,
   },
   closeBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    ...ROUND_BUTTON,
     backgroundColor: colors.WHITE,
-    alignItems: "center",
-    justifyContent: "center",
   },
 });

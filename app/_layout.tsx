@@ -2,6 +2,7 @@
 import React, { useEffect } from "react";
 import { View } from "react-native";
 import "react-native-reanimated";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast, {
   ErrorToast,
@@ -84,12 +85,14 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <AuthProvider>
-      <AccountProvider>
-        <StatsProvider>
-          <RootLayoutContent />
-        </StatsProvider>
-      </AccountProvider>
-    </AuthProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthProvider>
+        <AccountProvider>
+          <StatsProvider>
+            <RootLayoutContent />
+          </StatsProvider>
+        </AccountProvider>
+      </AuthProvider>
+    </GestureHandlerRootView>
   );
 }

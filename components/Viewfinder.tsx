@@ -1,10 +1,12 @@
-import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from "react-native";
 
 import { colors } from "../constants/colors";
 
-export default function Viewfinder({ style }: { style?: StyleProp<ViewStyle> }) {
+type ViewfinderProps = { style?: StyleProp<ViewStyle>; onLayout?: (event: LayoutChangeEvent) => void };
+
+export default function Viewfinder({ style, onLayout }: ViewfinderProps) {
   return (
-    <View style={[styles.viewfinder, style]} pointerEvents="none">
+    <View style={[styles.viewfinder, style]} pointerEvents="none" onLayout={onLayout}>
       <View style={[styles.corner, styles.cornerTL]} />
       <View style={[styles.corner, styles.cornerTR]} />
       <View style={[styles.corner, styles.cornerBL]} />
