@@ -7,7 +7,7 @@ import { formatOrderDate } from "../services/OrderDate";
 import { orderProgress } from "../services/OrderProgress";
 import { formatPrice, providerNames } from "./OrderCard";
 import OrderItemsBody from "./OrderItemsBody";
-import ReceptionNote from "./ReceptionNote";
+import ReceptionAction from "./ReceptionAction";
 
 type OrderDetailPaneProps = {
   accountId: string | undefined;
@@ -47,7 +47,7 @@ export default function OrderDetailPane({ accountId, order, tableLayout }: Order
         tableLayout={tableLayout}
         contentContainerStyle={styles.lines}
       />
-      <ReceptionNote order={order} />
+      <ReceptionAction order={order} />
     </View>
   );
 }

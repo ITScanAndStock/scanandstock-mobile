@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useNavigation, useRouter } from "expo-router";
 
@@ -43,7 +43,13 @@ export default function Orders() {
   }
 
   // A key on the Stack would not do: React Navigation rebuilds a remounted navigator from the parent route's state.
+  // Not on mount: the reset that opens the receipt's confirmation remounts this list beneath it.
+  const shownAccountId = useRef(accountId);
   useEffect(() => {
+    if (shownAccountId.current === accountId) {
+      return;
+    }
+    shownAccountId.current = accountId;
     if ((navigation.getState()?.index ?? 0) > 0) {
       navigation.dispatch({ type: "POP_TO_TOP" });
     }

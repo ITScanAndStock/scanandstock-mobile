@@ -1,16 +1,21 @@
 import type { AxiosResponse } from "axios";
 import type { Order, OrderFilter, OrderItem, OrderItemResponse, OrderResponse } from "../model/Order";
 import apiClient from "./ApiService";
+import type { ReceiveBody } from "./ReceiptDraft";
 
 const ORDER_PAGE_SIZE = 20;
 
 const MAX_PAGES_PER_STATUS = 10;
 
+// A large receipt can take the server longer than the client's default 15 s.
+const RECEIVE_TIMEOUT_MS = 60000;
+
 const TO_RECEIVE_STATUSES = ["En cours", "Partielle"] as const;
 
 export type OrderPage = { orders: Order[]; hasMore: boolean; nextOffset: number };
 
-export type OrdersToReceive = { orders: Order[]; count: number };
+// complete is false when a status had more pages than MAX_PAGES_PER_STATUS: an order missing from it may still be open.
+export type OrdersToReceive = { orders: Order[]; count: number; complete: boolean };
 
 // The API sorts on the date alone, with no tie-breaker: an order can come back on two pages.
 export function appendOrders(loaded: readonly Order[], incoming: readonly Order[]): Order[] {
@@ -37,7 +42,7 @@ async function fetchPage(accountId: string, offset: number, status?: string): Pr
   return sentUnder(accountId, await apiClient.get<OrderResponse>("/order", { params }));
 }
 
-type StatusList = { orders: Order[]; filters?: OrderFilter[] };
+type StatusList = { orders: Order[]; filters?: OrderFilter[]; complete: boolean };
 
 async function fetchStatus(accountId: string, status: string): Promise<StatusList> {
   let orders: Order[] = [];
@@ -46,15 +51,15 @@ async function fetchStatus(accountId: string, status: string): Promise<StatusLis
     const offset = pageIndex * ORDER_PAGE_SIZE;
     const page = await fetchPage(accountId, offset, status);
     if (!page) {
-      break;
+      return { orders, filters, complete: true };
     }
     orders = appendOrders(orders, page.content);
     filters ??= page.filters;
     if (offset + ORDER_PAGE_SIZE >= (page.filteredCount ?? page.total)) {
-      break;
+      return { orders, filters, complete: true };
     }
   }
-  return { orders, filters };
+  return { orders, filters, complete: false };
 }
 
 // The API computes its status counts without the request's filter: every non-empty response carries the same ones.
@@ -87,12 +92,21 @@ class OrderService {
     return {
       orders: appendOrders(pending.orders, partial.orders).sort(newestFirst),
       count: countToReceive(pending.filters ?? partial.filters),
+      complete: pending.complete && partial.complete,
     };
   }
 
   async getOrderItems(accountId: string, orderId: number): Promise<OrderItem[]> {
     const response = sentUnder(accountId, await apiClient.get<OrderItemResponse>(`/order/${orderId}`));
     return response?.content ?? [];
+  }
+
+  // The interceptor reads the active account after awaiting the token: a write cannot wait to learn whose it was.
+  async receiveOrder(accountId: string, orderId: number, body: ReceiveBody): Promise<void> {
+    await apiClient.post(`/order/${orderId}/receive`, body, {
+      timeout: RECEIVE_TIMEOUT_MS,
+      headers: { "Account-Id": accountId },
+    });
   }
 }
 

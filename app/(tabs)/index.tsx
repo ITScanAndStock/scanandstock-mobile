@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { type ComponentProps, useCallback, useEffect, useRef } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -23,7 +23,7 @@ import { useScreenBottomInset } from "../../components/TabBar";
 import MovementRow, { MOVEMENT_ROW_HEIGHT } from "../../components/ui-components/MovementRow";
 import { colors } from "@/constants/colors";
 import { isTablet } from "@/constants/layout";
-import { useScanCamera } from "@/context/ScanCameraContext";
+import { useCameraMounted, useScanCamera } from "@/context/ScanCameraContext";
 import { useStats } from "@/hooks/useStats";
 
 const PHONE_VISIBLE_MOVEMENTS = 3;
@@ -37,7 +37,7 @@ export default function Scan() {
   const isLandscape = width > height;
   const tablet = isTablet();
   const scannerRef = useRef<ScannerViewHandle>(null);
-  const { isCameraOpen, setCameraOpen, progress, homeOpacity } = useScanCamera();
+  const { isCameraOpen, setCameraOpen, progress, homeOpacity, cameraTurn } = useScanCamera();
   const bottomInset = useScreenBottomInset();
   const leftInset = useScreenLeftInset();
   const isFocused = useIsFocused();
@@ -108,7 +108,7 @@ export default function Scan() {
         importantForAccessibility={isCameraOpen ? "auto" : "no-hide-descendants"}
         accessibilityElementsHidden={!isCameraOpen}
       >
-        <ScannerView ref={scannerRef} active={isCameraOpen} onClose={closeCamera} />
+        {cameraTurn.home ? <HomeCamera ref={scannerRef} active={isCameraOpen} onClose={closeCamera} /> : null}
       </Animated.View>
 
       <Animated.View
@@ -191,6 +191,11 @@ export default function Scan() {
       </Animated.View>
     </View>
   );
+}
+
+function HomeCamera(props: ComponentProps<typeof ScannerView>) {
+  useCameraMounted("home");
+  return <ScannerView {...props} />;
 }
 
 export const styles = StyleSheet.create({

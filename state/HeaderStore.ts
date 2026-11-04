@@ -2,6 +2,7 @@ type HeaderState = {
   accountId?: string;
   tracingEnabled?: boolean;
   badgeScan?: string;
+  badgeName?: string;
 };
 
 const state: HeaderState = {};
@@ -25,10 +26,17 @@ const HeaderStore = {
   getBadgeScan() {
     return state.badgeScan;
   },
+  setBadgeName(name?: string | null) {
+    state.badgeName = name || undefined;
+  },
+  getBadgeName() {
+    return state.badgeName;
+  },
   reset() {
     state.accountId = undefined;
     state.tracingEnabled = undefined;
     state.badgeScan = undefined;
+    state.badgeName = undefined;
   },
 };
 

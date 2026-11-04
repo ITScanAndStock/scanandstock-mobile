@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Order } from "@/model/Order";
 import OrderService, { AccountChangedError, appendOrders, type OrdersToReceive } from "@/services/OrderService";
+import { pruneReceiptDrafts } from "@/services/ReceiptDraftStore";
 import OrderCache from "@/state/OrderCache";
 
 export type OrderListFilter = "toReceive" | "all";
@@ -39,7 +40,9 @@ export function useOrderList(accountId: string | undefined) {
         ]);
         OrderCache.remember(forAccountId, [...toReceive.orders, ...firstPage.orders]);
         update(forAccountId, () => ({ accountId: forAccountId, toReceive, all: firstPage, failed: false }));
+        void pruneReceiptDrafts(Date.now(), forAccountId, toReceive);
       } catch (error) {
+        void pruneReceiptDrafts(Date.now(), forAccountId);
         if (error instanceof AccountChangedError) {
           return;
         }

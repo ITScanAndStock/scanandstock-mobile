@@ -217,3 +217,28 @@ describe("AuthService.getToken", () => {
     expect(token).toBe("current-access");
   });
 });
+
+describe("AuthService.logout", () => {
+  let AuthService: typeof import("../AuthService").default;
+
+  beforeEach(async () => {
+    secureStore.clear();
+    asyncStore.clear();
+    vi.restoreAllMocks();
+    vi.resetModules();
+    AuthService = (await import("../AuthService")).default;
+    vi.stubGlobal("fetch", keycloakAnswers(200, {}));
+  });
+
+  it("keeps the receipt drafts, so that the automatic logout loses no scan (catches: drafts cleared with the session)", async () => {
+    const { receiptDraftKey } = await import("../ReceiptDraftStore");
+    const draftKey = receiptDraftKey({ email: "julie@cabinet.fr", accountId: "12", orderId: 5 });
+    asyncStore.set(draftKey, "{}");
+    asyncStore.set("activated_compte", "{}");
+
+    await AuthService.logout();
+
+    expect(asyncStore.has("activated_compte")).toBe(false);
+    expect(asyncStore.has(draftKey)).toBe(true);
+  });
+});

@@ -84,6 +84,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 
   const removeBadge = useCallback(async (scope: RemoveScope) => {
     HeaderStore.setBadgeScan(undefined);
+    HeaderStore.setBadgeName(undefined);
     setActiveBadgeId(null);
     setActiveBadgeName("");
     if (scope === "memory") {
@@ -134,6 +135,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     async (stored: StoredBadge | null) => {
       if (!stored) {
         HeaderStore.setBadgeScan(undefined);
+        HeaderStore.setBadgeName(undefined);
         return;
       }
       if (!isAuthenticatedRef.current) {
@@ -145,6 +147,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         setActiveBadgeId(stored.id);
         setActiveBadgeName(stored.name);
         HeaderStore.setBadgeScan(stored.scan);
+        HeaderStore.setBadgeName(stored.name);
       }
     },
     [badgeTimer, removeBadge],
