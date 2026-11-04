@@ -46,6 +46,7 @@ import CameraPermissionRequest from "./CameraPermissionRequest";
 import MouvementButton from "./MouvementButton";
 import ScanBadge from "./ScanBadge";
 import ScanLoader from "./ScanLoader";
+import TorchButton, { ROUND_BUTTON } from "./TorchButton";
 import Viewfinder from "./Viewfinder";
 import { useCameraControls } from "../hooks/useCameraControls";
 import { useScanSounds } from "../hooks/useScanSounds";
@@ -78,6 +79,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
   const insets = useSafeAreaInsets();
   const [scanGate] = useState(createScanGate);
   const cameraControls = useCameraControls();
+  const { opened: cameraOpened, closed: cameraClosed } = cameraControls;
 
   const sounds = useScanSounds();
 
@@ -150,6 +152,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
         activeRef.current = true;
         openCountRef.current += 1;
         scanGate.cameraReopened();
+        cameraOpened();
         handleMethodChange(INITIAL_METHOD);
         cameraRef.current?.resumePreview();
       },
@@ -157,6 +160,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
         activeRef.current = false;
         batchChoice.cameraClosed();
         scanGate.cameraClosed(Date.now());
+        cameraClosed();
         for (const timer of [bannerTimeoutRef, badgeTimeoutRef]) {
           if (timer.current) {
             clearTimeout(timer.current);
@@ -168,7 +172,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
         cameraRef.current?.pausePreview();
       },
     }),
-    [handleMethodChange, scanGate, batchChoice],
+    [handleMethodChange, scanGate, batchChoice, cameraOpened, cameraClosed],
   );
 
   const handleCameraReady = () => {
@@ -355,6 +359,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
       <CameraView
         ref={cameraRef}
         active={active}
+        enableTorch={cameraControls.torch}
         style={styles.camera}
         onCameraReady={handleCameraReady}
         barcodeScannerSettings={BARCODE_SCANNER_SETTINGS}
@@ -417,6 +422,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
 
           <View style={styles.controlsRow}>
             <MouvementButton method={method} setMethod={handleMethodChange} />
+            <TorchButton on={cameraControls.torch} onPress={cameraControls.toggleTorch} />
             <Pressable
               style={styles.closeBtn}
               onPress={onClose}
@@ -561,11 +567,7 @@ const styles = StyleSheet.create({
     right: 16,
   },
   closeBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    ...ROUND_BUTTON,
     backgroundColor: colors.WHITE,
-    alignItems: "center",
-    justifyContent: "center",
   },
 });

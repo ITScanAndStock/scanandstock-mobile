@@ -92,3 +92,97 @@ describe("CameraControls.accepts", () => {
     expect(controls.accepts(bounds(170, 480, 40, 40))).toBe(true);
   });
 });
+
+describe("CameraControls torch", () => {
+  it("starts with the torch off (catches: torch initially on)", () => {
+    expect(createCameraControls().getState().torch).toBe(false);
+  });
+
+  it("opened() puts a lit torch out (catches: torch kept on opening)", () => {
+    const controls = createCameraControls();
+    controls.toggleTorch();
+    controls.opened();
+    expect(controls.getState().torch).toBe(false);
+  });
+
+  it("closed() puts a lit torch out (catches: closed() without effect on the torch)", () => {
+    const controls = createCameraControls();
+    controls.toggleTorch();
+    controls.closed();
+    expect(controls.getState().torch).toBe(false);
+  });
+
+  it("toggleTorch() twice lights then puts out (catches: torch always on)", () => {
+    const controls = createCameraControls();
+    controls.toggleTorch();
+    expect(controls.getState().torch).toBe(true);
+    controls.toggleTorch();
+    expect(controls.getState().torch).toBe(false);
+  });
+
+  it("notifies a subscriber on toggleTorch (catches: notification removed from toggleTorch)", () => {
+    const controls = createCameraControls();
+    let calls = 0;
+    controls.subscribe(() => calls++);
+    controls.toggleTorch();
+    expect(calls).toBe(1);
+  });
+
+  it("notifies a subscriber on opened() with the torch on (catches: notification removed from opened)", () => {
+    const controls = createCameraControls();
+    controls.toggleTorch();
+    let calls = 0;
+    controls.subscribe(() => calls++);
+    controls.opened();
+    expect(calls).toBe(1);
+  });
+
+  it("notifies a subscriber on closed() with the torch on (catches: notification removed from closed)", () => {
+    const controls = createCameraControls();
+    controls.toggleTorch();
+    let calls = 0;
+    controls.subscribe(() => calls++);
+    controls.closed();
+    expect(calls).toBe(1);
+  });
+
+  it("does not notify when opened() or closed() find the torch already off (catches: notification without a change)", () => {
+    const controls = createCameraControls();
+    let calls = 0;
+    controls.subscribe(() => calls++);
+    controls.opened();
+    controls.closed();
+    expect(calls).toBe(0);
+  });
+
+  it("returns a new state object after a change (catches: state mutated in place)", () => {
+    const controls = createCameraControls();
+    const before = controls.getState();
+    controls.toggleTorch();
+    expect(controls.getState()).not.toBe(before);
+    expect(before.torch).toBe(false);
+  });
+
+  it("returns the same state object on two reads without change (catches: state recreated on each read)", () => {
+    const controls = createCameraControls();
+    expect(controls.getState()).toBe(controls.getState());
+    controls.toggleTorch();
+    expect(controls.getState()).toBe(controls.getState());
+  });
+
+  it("stops notifying after unsubscribe (catches: listener never removed)", () => {
+    const controls = createCameraControls();
+    let calls = 0;
+    const unsubscribe = controls.subscribe(() => calls++);
+    unsubscribe();
+    controls.toggleTorch();
+    expect(calls).toBe(0);
+  });
+
+  it("keeps the frame measure across a close and a reopening (catches: frame reset on close, nothing read after reopening)", () => {
+    const controls = measured();
+    controls.closed();
+    controls.opened();
+    expect(controls.accepts(bounds(170, 180, 40, 40))).toBe(true);
+  });
+});

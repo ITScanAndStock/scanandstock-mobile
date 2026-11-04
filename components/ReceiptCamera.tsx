@@ -6,6 +6,7 @@ import { colors } from "../constants/colors";
 import { useCameraMounted } from "../context/ScanCameraContext";
 import { useCameraControls } from "../hooks/useCameraControls";
 import CameraPermissionRequest from "./CameraPermissionRequest";
+import TorchButton from "./TorchButton";
 import Viewfinder from "./Viewfinder";
 
 type ReceiptCameraProps = { onScanned: (result: BarcodeScanningResult) => void };
@@ -23,6 +24,7 @@ export default function ReceiptCamera({ onScanned }: ReceiptCameraProps) {
   return (
     <View style={styles.container}>
       <MountedCamera
+        torch={cameraControls.torch}
         onScanned={(result) => {
           if (cameraControls.accepts(result.bounds)) onScanned(result);
         }}
@@ -31,21 +33,26 @@ export default function ReceiptCamera({ onScanned }: ReceiptCameraProps) {
         style={styles.viewfinder}
         onLayout={cameraControls.onFrameLayout}
       />
+      <TorchButton on={cameraControls.torch} onPress={cameraControls.toggleTorch} style={styles.torchButton} />
     </View>
   );
 }
 
-function MountedCamera({ onScanned }: ReceiptCameraProps) {
+function MountedCamera({ onScanned, torch }: ReceiptCameraProps & { torch: boolean }) {
   useCameraMounted("receipt");
   return (
     <CameraView
       active={true}
+      enableTorch={torch}
       style={StyleSheet.absoluteFill}
       barcodeScannerSettings={BARCODE_SCANNER_SETTINGS}
       onBarcodeScanned={onScanned}
     />
   );
 }
+
+const VIEWFINDER_HEIGHT = 170;
+const TORCH_BUTTON_GAP = 20;
 
 const styles = StyleSheet.create({
   container: {
@@ -55,6 +62,12 @@ const styles = StyleSheet.create({
   },
   viewfinder: {
     width: 260,
-    height: 170,
+    height: VIEWFINDER_HEIGHT,
+  },
+  torchButton: {
+    position: "absolute",
+    alignSelf: "center",
+    top: "50%",
+    marginTop: VIEWFINDER_HEIGHT / 2 + TORCH_BUTTON_GAP,
   },
 });
