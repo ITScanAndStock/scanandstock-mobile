@@ -17,22 +17,6 @@ class ProductService {
     return sentUnder(accountId, response)?.content ?? [];
   }
 
-  async getStats() {
-    try {
-      const response = await apiClient.get<StatsResponse>(
-        "/statistics/stocks/last",
-      );
-      const statsList = response.data.content;
-
-      return statsList;
-    } catch (e) {
-      if (__DEV__) {
-        console.error("❌ Erreur lors de la récupération des stats", e);
-      }
-      ToastService.error("Impossible de charger les statistiques");
-      throw e;
-    }
-  }
   async scan(
     code: string,
     method: Method,

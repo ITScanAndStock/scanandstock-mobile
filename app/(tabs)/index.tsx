@@ -16,6 +16,7 @@ import { useIsFocused } from "expo-router";
 import ScanProductIcon from "../../assets/images/figma/scan-product.svg";
 import ChoosAccount from "../../components/ChooseAccount";
 import Header from "../../components/Header";
+import { LoadFailed, Loading, RetryButton, styles as loadStyles } from "../../components/LoadState";
 import ScanBadge from "../../components/ScanBadge";
 import ScannerView, { ScannerViewHandle } from "../../components/ScannerView";
 import { useScreenLeftInset } from "../../components/SideRail";
@@ -27,15 +28,16 @@ import { useCameraMounted, useScanCamera } from "@/context/ScanCameraContext";
 import { useStats } from "@/hooks/useStats";
 
 const PHONE_VISIBLE_MOVEMENTS = 3;
+const TABLET_PORTRAIT_VISIBLE_MOVEMENTS = 5;
 const OPEN_DURATION_MS = 500;
 const CLOSE_DURATION_MS = 400;
 
 export default function Scan() {
-  const { stats, isLoading } = useStats();
-  const recentStats = stats?.slice(0, 5) ?? [];
+  const { movements, loading, firstLoadFailed, nextPageFailed, loadNextPage, retry } = useStats();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   const tablet = isTablet();
+  const listHeight = movementsListHeight(tablet, isLandscape);
   const scannerRef = useRef<ScannerViewHandle>(null);
   const { isCameraOpen, setCameraOpen, progress, homeOpacity, cameraTurn } = useScanCamera();
   const bottomInset = useScreenBottomInset();
@@ -94,6 +96,15 @@ export default function Scan() {
     inputRange: [0, 0.55, 1],
     outputRange: [1, 0.7, 0],
   });
+  let movementsState;
+  if (loading === "first") {
+    movementsState = <Loading label="Chargement des mouvements" />;
+  } else if (firstLoadFailed) {
+    movementsState = <LoadFailed message="Impossible de charger les mouvements" onRetry={retry} />;
+  } else if (movements.length === 0) {
+    movementsState = <Text style={styles.emptyText}>Aucun mouvement récent</Text>;
+  }
+
   const cameraOpacity = progress.interpolate({
     inputRange: [0.25, 1],
     outputRange: [0, 1],
@@ -163,34 +174,57 @@ export default function Scan() {
         pointerEvents={isCameraOpen ? "none" : "auto"}
         importantForAccessibility={isCameraOpen ? "no-hide-descendants" : "auto"}
         accessibilityElementsHidden={isCameraOpen}
-        accessible={true}
-        accessibilityLabel="Derniers mouvements"
-        accessibilityRole="list"
       >
         <View style={styles.movementsHeader}>
-          <Text style={styles.movementsTitle}>Derniers mouvements</Text>
-          <Text style={styles.movementsSubtitle}>5 derniers</Text>
+          <Text style={styles.movementsTitle} accessibilityRole="header">
+            Derniers mouvements
+          </Text>
         </View>
 
-        {isLoading ? (
-          <ActivityIndicator
-            size="large"
-            color={colors.DARK}
-            style={styles.loader}
-            accessibilityLabel="Chargement des mouvements"
-          />
+        {movementsState ? (
+          <View style={listHeight === undefined ? styles.movementsFill : { height: listHeight }}>{movementsState}</View>
         ) : (
           <FlatList
-            data={recentStats}
-            keyExtractor={(item, index) => `${item.designation}-${item.mvmtDateTime}-${index}`}
+            data={movements}
+            keyExtractor={(item) => String(item.id)}
             renderItem={({ item }) => <MovementRow item={item} />}
-            style={tablet ? undefined : styles.movementsList}
-            ListEmptyComponent={<Text style={styles.emptyText}>Aucun mouvement récent</Text>}
+            style={listHeight === undefined ? undefined : { maxHeight: listHeight }}
+            ListFooterComponent={
+              <MovementsFooter loading={loading === "nextPage"} failed={nextPageFailed} onRetry={retry} />
+            }
+            onEndReached={loadNextPage}
+            onEndReachedThreshold={0.5}
           />
         )}
       </Animated.View>
     </View>
   );
+}
+
+function movementsListHeight(tablet: boolean, landscape: boolean) {
+  if (!tablet) {
+    return PHONE_VISIBLE_MOVEMENTS * MOVEMENT_ROW_HEIGHT;
+  }
+  return landscape ? undefined : TABLET_PORTRAIT_VISIBLE_MOVEMENTS * MOVEMENT_ROW_HEIGHT;
+}
+
+function MovementsFooter({ loading, failed, onRetry }: { loading: boolean; failed: boolean; onRetry: () => void }) {
+  if (failed) {
+    return (
+      <View style={styles.footer}>
+        <Text style={loadStyles.message}>Impossible de charger la suite</Text>
+        <RetryButton onPress={onRetry} />
+      </View>
+    );
+  }
+  if (loading) {
+    return (
+      <View style={styles.footer}>
+        <ActivityIndicator color={colors.GREEN_DARK} accessibilityLabel="Chargement de la suite" />
+      </View>
+    );
+  }
+  return null;
 }
 
 function HomeCamera(props: ComponentProps<typeof ScannerView>) {
@@ -286,9 +320,6 @@ export const styles = StyleSheet.create({
     zIndex: 5,
   },
   movementsHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
     marginBottom: 6,
   },
   movementsTitle: {
@@ -296,16 +327,13 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "SemiBold",
   },
-  movementsSubtitle: {
-    color: colors.MUTED,
-    fontSize: 12,
-    fontFamily: "Montserrat",
+  movementsFill: {
+    flex: 1,
   },
-  movementsList: {
-    maxHeight: PHONE_VISIBLE_MOVEMENTS * MOVEMENT_ROW_HEIGHT,
-  },
-  loader: {
-    marginTop: 24,
+  footer: {
+    alignItems: "center",
+    paddingVertical: 12,
+    gap: 10,
   },
   emptyText: {
     marginTop: 20,

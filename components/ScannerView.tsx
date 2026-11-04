@@ -86,7 +86,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
 
   const sounds = useScanSounds();
 
-  const { refresh: refreshStats, stats } = useStats();
+  const { afterWrite, movements } = useStats();
   const [method, setMethod] = useState(INITIAL_METHOD);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBadgeProcessing, setIsBadgeProcessing] = useState(false);
@@ -116,7 +116,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
     () => ({
       onSucceeded: ({ message }) => {
         ToastService.success(message.split("<br/>")[0], "Succès");
-        refreshStats();
+        afterWrite();
         Vibration.vibrate(100);
         sounds.success();
       },
@@ -126,10 +126,10 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
         sounds.error();
       },
     }),
-    [refreshStats, sounds],
+    [afterWrite, sounds],
   );
 
-  const lastScan = stats && stats.length > 0 ? stats[0] : null;
+  const lastScan = movements[0] ?? null;
   const lastScanDirection = lastScan ? movementDirection(lastScan) : null;
 
   const handleMethodChange = useCallback((newMethod: Method) => {
@@ -237,7 +237,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
         ProductService.scan(cleanedCode, method, force)
           .then(() => {
             scanGate.sendFinished(true);
-            refreshStats();
+            afterWrite();
             sounds.success();
           })
           .catch((error: AxiosErrorType) => {
@@ -290,7 +290,7 @@ export default function ScannerView({ active, onClose, ref }: ScannerViewProps) 
 
       sendScan(false);
     },
-    [scanGate, batchChoice, batchFeedback, method, refreshStats, sounds, scanSent],
+    [scanGate, batchChoice, batchFeedback, method, afterWrite, sounds, scanSent],
   );
 
   const handleScan = ({ data, bounds }: BarcodeScanningResult) => {

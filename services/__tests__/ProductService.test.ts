@@ -36,17 +36,6 @@ describe("ProductService", () => {
     HeaderStore.reset();
   });
 
-  it("returns every stat sent by the API, in order", async () => {
-    const content = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }];
-    mockedApi.get.mockResolvedValue({ data: { content } });
-
-    const stats = await ProductService.getStats();
-
-    expect(mockedApi.get).toHaveBeenCalledWith("/statistics/stocks/last");
-    expect(stats).toEqual(content);
-    expect(mockedToast.error).not.toHaveBeenCalled();
-  });
-
   describe("getMovementsPage", () => {
     const ACCOUNT = "12";
     const content = [{ id: 7 }, { id: 5 }, { id: 6 }];

@@ -121,9 +121,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     if (stored.accounts) {
       setAccounts(stored.accounts);
     }
-    if (stored.activeAccount) {
-      setActiveAccountState(stored.activeAccount);
-    }
+    setActiveAccountState(stored.activeAccount ?? null);
     HeaderStore.setAccountId(stored.activeAccount?.id);
     if (stored.tracingEnabled !== undefined) {
       setIsTracingEnabled(stored.tracingEnabled);

@@ -14,10 +14,16 @@ export function LoadFailed({ message, onRetry }: { message: string; onRetry: () 
   return (
     <View style={styles.center}>
       <Text style={styles.message}>{message}</Text>
-      <Pressable style={styles.retry} onPress={onRetry} accessibilityRole="button">
-        <Text style={styles.retryText}>Réessayer</Text>
-      </Pressable>
+      <RetryButton onPress={onRetry} />
     </View>
+  );
+}
+
+export function RetryButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable style={styles.retry} onPress={onPress} accessibilityRole="button">
+      <Text style={styles.retryText}>Réessayer</Text>
+    </Pressable>
   );
 }
 
