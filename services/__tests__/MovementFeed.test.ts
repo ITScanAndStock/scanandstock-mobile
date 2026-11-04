@@ -187,6 +187,28 @@ describe("MovementFeed", () => {
     expect(shownIds()).toEqual(range(201, 20).map((m) => m.id));
   });
 
+  it("calls no toast for a pull that fails after a reload replaced it (catches: stale failure exposed)", async () => {
+    const { feed, calls, onPullFailed, fail } = await withFirstPage();
+    feed.pull();
+    feed.afterWrite();
+
+    await fail(calls[1]);
+
+    expect(onPullFailed).not.toHaveBeenCalled();
+    expect(feed.getState().loading).toBe("reload");
+  });
+
+  it("keeps the second of two pulls when the first answers last (catches: pull not invalidating earlier requests)", async () => {
+    const { feed, calls, answer, shownIds } = await withFirstPage();
+    feed.pull();
+    feed.pull();
+
+    await answer(calls[2], range(201, 20));
+    await answer(calls[1], range(101, 20));
+
+    expect(shownIds()).toEqual(range(201, 20).map((m) => m.id));
+  });
+
   it("tells a first load, a reload and a next page apart, the list kept during a reload (catches: one loading state for all; list emptied at a reload)", async () => {
     const { feed, calls, answer } = setup();
     feed.setSession({ accountId: "12", connected: true });
@@ -290,6 +312,40 @@ describe("MovementFeed", () => {
     expect(feed.getState().nextPageFailed).toBe(false);
   });
 
+  it("keeps the list and calls the toast once when a pull fails (catches: toast forgotten; list emptied at the failure)", async () => {
+    const { feed, calls, onPullFailed, fail } = await withFirstPage();
+    feed.pull();
+
+    await fail(calls[1]);
+
+    expect(feed.getState()).toMatchObject({ loading: null, firstLoadFailed: false, pulling: false });
+    expect(feed.getState().movements).toHaveLength(20);
+    expect(onPullFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it("tells a pull of an empty list, then shows the first load failure and calls the toast once when it fails (catches: pulling only when the list is kept; toast only when the list is kept)", async () => {
+    const { feed, calls, onPullFailed, fail } = await withFirstPage([]);
+    feed.pull();
+    expect(feed.getState()).toMatchObject({ pulling: true, loading: "first" });
+
+    await fail(calls[1]);
+
+    expect(feed.getState()).toMatchObject({ loading: null, firstLoadFailed: true, pulling: false });
+    expect(onPullFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it("tells a pull in progress, and only a pull (catches: pulling bound to every reload; pulling left on after the answer)", async () => {
+    const { feed, calls, answer } = await withFirstPage();
+
+    feed.pull();
+    expect(feed.getState()).toMatchObject({ pulling: true, loading: "reload" });
+    await answer(calls[1], range(1, 20));
+    expect(feed.getState().pulling).toBe(false);
+
+    feed.afterWrite();
+    expect(feed.getState()).toMatchObject({ pulling: false, loading: "reload" });
+  });
+
   it("keeps the list and calls no toast when a reload after a write fails (catches: toast on reloads after a write; list emptied at the failure)", async () => {
     const { feed, calls, onPullFailed, fail } = await withFirstPage();
     feed.afterWrite();
@@ -319,6 +375,16 @@ describe("MovementFeed", () => {
     expect(feed.getState()).toMatchObject({ loading: null, nextPageFailed: false });
   });
 
+  it("ends a pull rejected for an account change without a toast (catches: pulling left on after an AccountChangedError)", async () => {
+    const { feed, calls, onPullFailed, fail } = await withFirstPage();
+    feed.pull();
+
+    await fail(calls[1], new AccountChangedError());
+
+    expect(feed.getState()).toMatchObject({ loading: null, pulling: false, firstLoadFailed: false });
+    expect(onPullFailed).not.toHaveBeenCalled();
+  });
+
   it("asks nothing without an account or while disconnected (catches: loading without a session)", () => {
     const { feed, loadPage } = setup();
 
@@ -346,12 +412,18 @@ describe("MovementFeed", () => {
     await fail(calls[0]);
     feed.setSession({ accountId: "12", connected: false });
 
+    feed.pull();
     feed.loadNextPage();
     feed.retry();
     feed.afterWrite();
 
     expect(loadPage).toHaveBeenCalledTimes(1);
-    expect(feed.getState()).toMatchObject({ loading: null, firstLoadFailed: false, nextPageFailed: false });
+    expect(feed.getState()).toMatchObject({
+      loading: null,
+      firstLoadFailed: false,
+      nextPageFailed: false,
+      pulling: false,
+    });
   });
 
   it("loads once for a session given twice (catches: repeated session reloading)", () => {

@@ -9,6 +9,7 @@ export type MovementFeedState = {
   loading: MovementLoading;
   firstLoadFailed: boolean;
   nextPageFailed: boolean;
+  pulling: boolean;
 };
 
 export type MovementSession = {
@@ -28,6 +29,7 @@ const EMPTY: MovementFeedState = {
   loading: null,
   firstLoadFailed: false,
   nextPageFailed: false,
+  pulling: false,
 };
 
 // A movement written between two pages shifts the rest by one: the last movement seen comes back.
@@ -36,7 +38,7 @@ export function appendMovements(loaded: readonly StatsModel[], incoming: readonl
   return [...loaded, ...incoming.filter((movement) => !seen.has(movement.id) && seen.add(movement.id))];
 }
 
-export function createMovementFeed({ loadPage, pageSize }: MovementFeedOptions) {
+export function createMovementFeed({ loadPage, pageSize, onPullFailed }: MovementFeedOptions) {
   let state = EMPTY;
   let accountId: string | null = null;
   // Bumped by every reload and session change, so an answer to an earlier request changes nothing.
@@ -70,7 +72,7 @@ export function createMovementFeed({ loadPage, pageSize }: MovementFeedOptions) 
           return;
         }
         if (error instanceof AccountChangedError) {
-          update({ loading: null });
+          update({ loading: null, pulling: false });
         } else {
           onFailure();
         }
@@ -78,9 +80,9 @@ export function createMovementFeed({ loadPage, pageSize }: MovementFeedOptions) 
     );
   };
 
-  const reload = (account: string) => {
+  const reload = (account: string, fromPull = false) => {
     generation += 1;
-    update({ loading: state.movements.length > 0 ? "reload" : "first" });
+    update({ loading: state.movements.length > 0 ? "reload" : "first", pulling: fromPull });
     request(
       account,
       0,
@@ -92,9 +94,15 @@ export function createMovementFeed({ loadPage, pageSize }: MovementFeedOptions) 
           loading: null,
           firstLoadFailed: false,
           nextPageFailed: false,
+          pulling: false,
         });
       },
-      () => update(state.movements.length > 0 ? { loading: null } : { loading: null, firstLoadFailed: true }),
+      () => {
+        update({ loading: null, pulling: false, firstLoadFailed: state.movements.length === 0 });
+        if (fromPull) {
+          onPullFailed();
+        }
+      },
     );
   };
 
@@ -135,6 +143,11 @@ export function createMovementFeed({ loadPage, pageSize }: MovementFeedOptions) 
       update(EMPTY);
       if (next !== null) {
         reload(next);
+      }
+    },
+    pull: () => {
+      if (accountId !== null) {
+        reload(accountId, true);
       }
     },
     loadNextPage: () => {

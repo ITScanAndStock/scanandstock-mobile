@@ -5,7 +5,7 @@ import ToastService from "../services/ToastService";
 import { useAccount } from "./AccountContext";
 import { useAuth } from "./AuthContext";
 
-type StatsContextType = MovementFeedState & Pick<MovementFeed, "loadNextPage" | "retry" | "afterWrite">;
+type StatsContextType = MovementFeedState & Pick<MovementFeed, "pull" | "loadNextPage" | "retry" | "afterWrite">;
 
 const StatsContext = createContext<StatsContextType | undefined>(undefined);
 
@@ -28,7 +28,13 @@ export function StatsProvider({ children }: { children: React.ReactNode }) {
   }, [feed, accountId, isAuthenticated]);
 
   const value = useMemo(
-    () => ({ ...state, loadNextPage: feed.loadNextPage, retry: feed.retry, afterWrite: feed.afterWrite }),
+    () => ({
+      ...state,
+      pull: feed.pull,
+      loadNextPage: feed.loadNextPage,
+      retry: feed.retry,
+      afterWrite: feed.afterWrite,
+    }),
     [feed, state],
   );
 

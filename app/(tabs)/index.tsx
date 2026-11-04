@@ -6,6 +6,7 @@ import {
   Easing,
   FlatList,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -33,7 +34,7 @@ const OPEN_DURATION_MS = 500;
 const CLOSE_DURATION_MS = 400;
 
 export default function Scan() {
-  const { movements, loading, firstLoadFailed, nextPageFailed, loadNextPage, retry } = useStats();
+  const { movements, loading, firstLoadFailed, nextPageFailed, pulling, pull, loadNextPage, retry } = useStats();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   const tablet = isTablet();
@@ -97,12 +98,14 @@ export default function Scan() {
     outputRange: [1, 0.7, 0],
   });
   let movementsState;
-  if (loading === "first") {
+  if (loading === "first" && !pulling) {
     movementsState = <Loading label="Chargement des mouvements" />;
   } else if (firstLoadFailed) {
     movementsState = <LoadFailed message="Impossible de charger les mouvements" onRetry={retry} />;
-  } else if (movements.length === 0) {
-    movementsState = <Text style={styles.emptyText}>Aucun mouvement récent</Text>;
+  }
+  let listStyle;
+  if (listHeight !== undefined) {
+    listStyle = movements.length === 0 ? { height: listHeight } : { maxHeight: listHeight };
   }
 
   const cameraOpacity = progress.interpolate({
@@ -188,12 +191,14 @@ export default function Scan() {
             data={movements}
             keyExtractor={(item) => String(item.id)}
             renderItem={({ item }) => <MovementRow item={item} />}
-            style={listHeight === undefined ? undefined : { maxHeight: listHeight }}
+            style={listStyle}
+            ListEmptyComponent={<Text style={styles.emptyText}>Aucun mouvement récent</Text>}
             ListFooterComponent={
               <MovementsFooter loading={loading === "nextPage"} failed={nextPageFailed} onRetry={retry} />
             }
             onEndReached={loadNextPage}
             onEndReachedThreshold={0.5}
+            refreshControl={<RefreshControl refreshing={pulling} onRefresh={pull} />}
           />
         )}
       </Animated.View>
