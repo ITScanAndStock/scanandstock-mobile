@@ -1,7 +1,9 @@
-import type { AxiosResponse } from "axios";
 import type { Order, OrderFilter, OrderItem, OrderItemResponse, OrderResponse } from "../model/Order";
+import { sentUnder } from "./AccountResponse";
 import apiClient from "./ApiService";
 import type { ReceiveBody } from "./ReceiptDraft";
+
+export { AccountChangedError } from "./AccountResponse";
 
 const ORDER_PAGE_SIZE = 20;
 
@@ -21,16 +23,6 @@ export type OrdersToReceive = { orders: Order[]; count: number; complete: boolea
 export function appendOrders(loaded: readonly Order[], incoming: readonly Order[]): Order[] {
   const seen = new Set(loaded.map((order) => order.orderId));
   return [...loaded, ...incoming.filter((order) => !seen.has(order.orderId) && seen.add(order.orderId))];
-}
-
-export class AccountChangedError extends Error {}
-
-// The Account-Id header is read when the request leaves, after the token wait: an account switch can slip in between.
-function sentUnder<T>(accountId: string, response: AxiosResponse<T>): T | null {
-  if (String(response.config.headers?.["Account-Id"]) !== String(accountId)) {
-    throw new AccountChangedError();
-  }
-  return response.status === 204 ? null : response.data;
 }
 
 async function fetchPage(accountId: string, offset: number, status?: string): Promise<OrderResponse | null> {

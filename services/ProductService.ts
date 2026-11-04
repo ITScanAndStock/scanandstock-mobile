@@ -1,12 +1,22 @@
 import { AxiosErrorType } from "../model/ApiError";
-import { StatsResponse } from "../model/Stats";
+import { StatsModel, StatsResponse } from "../model/Stats";
 import { Method, StockModel } from "../model/Stock";
 import HeaderStore from "../state/HeaderStore";
+import { sentUnder } from "./AccountResponse";
 import apiClient from "./ApiService";
 import { movementErrorToast } from "./MovementErrorToast";
 import ToastService from "./ToastService";
 
+export const MOVEMENT_PAGE_SIZE = 20;
+
 class ProductService {
+  async getMovementsPage(accountId: string, offset: number): Promise<StatsModel[]> {
+    const response = await apiClient.get<StatsResponse>("/statistics/stocks", {
+      params: { "page.size": MOVEMENT_PAGE_SIZE, "page.offset": offset },
+    });
+    return sentUnder(accountId, response)?.content ?? [];
+  }
+
   async getStats() {
     try {
       const response = await apiClient.get<StatsResponse>(
