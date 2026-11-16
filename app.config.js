@@ -34,7 +34,7 @@ export default {
   expo: {
     name: IS_PREVIEW ? "ScanAndStock (Staging)" : "Scan&Stock",
     slug: "scanandstock",
-    version: "1.0.7",
+    version: "1.0.8",
     orientation: "default",
     icon: "./assets/images/splash-icon.png",
     scheme: "scanandstock",
