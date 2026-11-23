@@ -116,7 +116,7 @@ export default {
             "Allow $(PRODUCT_NAME) to access your Face ID biometric data.",
         },
       ],
-      "expo-audio",
+      ["expo-audio", { enableBackgroundPlayback: false }],
     ],
     experiments: {
       typedRoutes: true,
