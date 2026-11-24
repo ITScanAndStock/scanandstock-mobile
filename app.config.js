@@ -117,6 +117,10 @@ export default {
         },
       ],
       ["expo-audio", { enableBackgroundPlayback: false }],
+      [
+        "expo-build-properties",
+        { android: { enableMinifyInReleaseBuilds: true } },
+      ],
     ],
     experiments: {
       typedRoutes: true,
