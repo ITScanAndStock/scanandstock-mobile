@@ -6,9 +6,6 @@ import type { ReceiptDraft } from "./ReceiptDraft";
 import { receiptResult } from "./ReceiptResult";
 import ReceiptResults from "../state/ReceiptResults";
 
-// The API writes the movements asynchronously: a reload right after the receipt may not see them yet.
-const LATER_MOVEMENTS_RELOAD_MS = 2000;
-
 export type SendOutcome =
   | { kind: "sent" }
   | { kind: "busy" }
@@ -104,7 +101,6 @@ export function createReceiptSend({ draft, orderId, refreshMovements, scanSent, 
     draft.setMarks({ uncertainSend: false });
     forgetDraft();
     refreshMovements();
-    setTimeout(refreshMovements, LATER_MOVEMENTS_RELOAD_MS);
     ReceiptResults.remember(accountId, orderId, result);
     return { kind: "sent" };
   };

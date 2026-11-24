@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Method } from "../../model/Stock";
 import HeaderStore from "../../state/HeaderStore";
+import { AccountChangedError } from "../AccountResponse";
 import apiClient from "../ApiService";
 import ProductService from "../ProductService";
 import ToastService from "../ToastService";
@@ -35,15 +36,50 @@ describe("ProductService", () => {
     HeaderStore.reset();
   });
 
-  it("returns every stat sent by the API, in order", async () => {
-    const content = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }];
-    mockedApi.get.mockResolvedValue({ data: { content } });
+  describe("getMovementsPage", () => {
+    const ACCOUNT = "12";
+    const content = [{ id: 7 }, { id: 5 }, { id: 6 }];
 
-    const stats = await ProductService.getStats();
+    function answer(accountHeader: unknown, status = 200, data: unknown = { content }) {
+      return { status, data, config: { headers: { "Account-Id": accountHeader } } };
+    }
 
-    expect(mockedApi.get).toHaveBeenCalledWith("/statistics/stocks/last");
-    expect(stats).toEqual(content);
-    expect(mockedToast.error).not.toHaveBeenCalled();
+    it("asks /statistics/stocks for 20 movements at the offset and returns them in order (catches: old /stocks/last route; offset not sent)", async () => {
+      mockedApi.get.mockResolvedValue(answer(ACCOUNT));
+
+      const movements = await ProductService.getMovementsPage(ACCOUNT, 40);
+
+      expect(mockedApi.get).toHaveBeenCalledWith("/statistics/stocks", {
+        params: { "page.size": 20, "page.offset": 40 },
+      });
+      expect(movements).toEqual(content);
+    });
+
+    it("returns an empty page on a 204 with no body (catches: content read on a 204)", async () => {
+      mockedApi.get.mockResolvedValue(answer(ACCOUNT, 204, ""));
+
+      await expect(ProductService.getMovementsPage(ACCOUNT, 20)).resolves.toEqual([]);
+    });
+
+    it("accepts a page sent under account 12 as a number for a call made with \"12\" (catches: strict comparison without conversion)", async () => {
+      mockedApi.get.mockResolvedValue(answer(12));
+
+      await expect(ProductService.getMovementsPage(ACCOUNT, 0)).resolves.toEqual(content);
+    });
+
+    it("refuses a page sent under another account (catches: account check removed)", async () => {
+      mockedApi.get.mockResolvedValue(answer(13));
+
+      await expect(ProductService.getMovementsPage(ACCOUNT, 0)).rejects.toThrow(AccountChangedError);
+    });
+
+    it("rethrows an HTTP error without a toast (catches: toast kept in the service)", async () => {
+      const failure = { response: { status: 500, data: {} }, message: "server error" };
+      mockedApi.get.mockRejectedValue(failure);
+
+      await expect(ProductService.getMovementsPage(ACCOUNT, 0)).rejects.toBe(failure);
+      expect(mockedToast.error).not.toHaveBeenCalled();
+    });
   });
 
   it("sends scan payload and surfaces backend message", async () => {

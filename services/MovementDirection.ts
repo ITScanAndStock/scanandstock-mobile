@@ -8,10 +8,10 @@ const INCREASE_TYPES = ["increase", "in", "entrée"];
 const DECREASE_TYPES = ["decrease", "out", "sortie"];
 
 function isIncrease({ type, quantity }: Movement): boolean {
-  if (INCREASE_TYPES.includes(type)) {
+  if (type !== undefined && INCREASE_TYPES.includes(type)) {
     return true;
   }
-  if (DECREASE_TYPES.includes(type)) {
+  if (type !== undefined && DECREASE_TYPES.includes(type)) {
     return false;
   }
   return quantity >= 0;

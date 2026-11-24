@@ -8,13 +8,14 @@ export class StatsResponse {
 }
 
 export class StatsModel {
+  public id: number = 0;
   public designation: string = "";
   public mvmtDateTime: string = "";
   public price: number = 0;
   public provider: string = "";
   public quantity: number = 0;
   public totalStock: number = 0;
-  public type: string = "";
+  public type?: string;
   public userEmail: string = "";
   public userName: string = "";
   public action: string = "";

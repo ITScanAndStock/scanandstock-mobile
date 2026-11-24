@@ -244,15 +244,15 @@ describe("ReceiptSend", () => {
     expect(mockedApi.post).toHaveBeenCalledTimes(1);
   });
 
-  it("reloads the home movements now and 2 s after a receipt is recorded (catches: the later reload removed)", async () => {
+  it("reloads the home movements once after a receipt is recorded, still once at 10 s (catches: its own later reload kept, on top of the feed's)", async () => {
     vi.useFakeTimers();
     const { refreshMovements, sender } = setup();
 
     await sender.send();
     expect(refreshMovements).toHaveBeenCalledTimes(1);
-    vi.advanceTimersByTime(2000);
+    vi.advanceTimersByTime(10_000);
 
-    expect(refreshMovements).toHaveBeenCalledTimes(2);
+    expect(refreshMovements).toHaveBeenCalledTimes(1);
   });
 
   it("keeps for the confirmation what is left after the reload (catches: result taken before the reload)", async () => {

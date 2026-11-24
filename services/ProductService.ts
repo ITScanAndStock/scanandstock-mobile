@@ -1,28 +1,22 @@
 import { AxiosErrorType } from "../model/ApiError";
-import { StatsResponse } from "../model/Stats";
+import { StatsModel, StatsResponse } from "../model/Stats";
 import { Method, StockModel } from "../model/Stock";
 import HeaderStore from "../state/HeaderStore";
+import { sentUnder } from "./AccountResponse";
 import apiClient from "./ApiService";
 import { movementErrorToast } from "./MovementErrorToast";
 import ToastService from "./ToastService";
 
-class ProductService {
-  async getStats() {
-    try {
-      const response = await apiClient.get<StatsResponse>(
-        "/statistics/stocks/last",
-      );
-      const statsList = response.data.content;
+export const MOVEMENT_PAGE_SIZE = 20;
 
-      return statsList;
-    } catch (e) {
-      if (__DEV__) {
-        console.error("❌ Erreur lors de la récupération des stats", e);
-      }
-      ToastService.error("Impossible de charger les statistiques");
-      throw e;
-    }
+class ProductService {
+  async getMovementsPage(accountId: string, offset: number): Promise<StatsModel[]> {
+    const response = await apiClient.get<StatsResponse>("/statistics/stocks", {
+      params: { "page.size": MOVEMENT_PAGE_SIZE, "page.offset": offset },
+    });
+    return sentUnder(accountId, response)?.content ?? [];
   }
+
   async scan(
     code: string,
     method: Method,

@@ -23,6 +23,10 @@ describe("movementDirection", () => {
     expect(movementDirection({ type: "", quantity: 3 })).toEqual({ increase: true, label: "+3" });
   });
 
+  it("reads a movement without a type on the sign: -2 gives −2 (catches: missing type read as an entry)", () => {
+    expect(movementDirection({ quantity: -2 })).toEqual({ increase: false, label: "−2" });
+  });
+
   it("reads an unknown type with quantity 0 as an entry (catches: > 0 instead of >= 0)", () => {
     expect(movementDirection({ type: "", quantity: 0 })).toEqual({ increase: true, label: "+0" });
   });

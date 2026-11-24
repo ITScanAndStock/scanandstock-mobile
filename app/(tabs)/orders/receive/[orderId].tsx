@@ -172,7 +172,7 @@ function ReceiptSession({ order, items, saved, onLeave, onAccountChanged }: Rece
   const { cameraTurn } = useScanCamera();
   const navigation = useNavigation();
   const sounds = useScanSounds();
-  const { refresh: refreshStats } = useStats();
+  const { afterWrite } = useStats();
   const { getBadge, isBadgeValid, scanSent, isTracingEnabled, activeBadgeName } = useAccount();
   const [banner, setBanner] = useState<ReceiptBanner | null>(null);
   const [sending, setSending] = useState(false);
@@ -185,7 +185,7 @@ function ReceiptSession({ order, items, saved, onLeave, onAccountChanged }: Rece
       sounds,
       onBanner: setBanner,
       onAccountChanged,
-      refreshMovements: () => void refreshStats(),
+      refreshMovements: afterWrite,
       isBadgeValid,
       connectBadge: getBadge,
       scanSent,

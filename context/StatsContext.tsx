@@ -1,72 +1,44 @@
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
-import { StatsModel } from "../model/Stats";
-import ProductService from "../services/ProductService";
+import React, { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { createMovementFeed, type MovementFeed, type MovementFeedState } from "../services/MovementFeed";
+import ProductService, { MOVEMENT_PAGE_SIZE } from "../services/ProductService";
+import ToastService from "../services/ToastService";
 import { useAccount } from "./AccountContext";
+import { useAuth } from "./AuthContext";
 
-type StatsContextType = {
-  stats?: StatsModel[];
-  isLoading: boolean;
-  error: Error | null;
-  refresh: () => Promise<void>;
-};
+type StatsContextType = MovementFeedState & Pick<MovementFeed, "pull" | "loadNextPage" | "retry" | "afterWrite">;
 
 const StatsContext = createContext<StatsContextType | undefined>(undefined);
 
 export function StatsProvider({ children }: { children: React.ReactNode }) {
-  const { activeAccount, isTracingEnabled, activeBadgeId } = useAccount();
-  const [stats, setStats] = useState<StatsModel[]>();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [lastAccountId, setLastAccountId] = useState<string | null>(null);
-
-  const loadStats = useCallback(async () => {
-    if (!activeAccount?.id) {
-      setStats(undefined);
-      setLastAccountId(null);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setError(null);
-      const response = await ProductService.getStats();
-      if (response) {
-        setStats(response);
-      } else {
-        setStats([]);
-      }
-      setLastAccountId(activeAccount.id);
-    } catch (err) {
-      setError(err as Error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [activeAccount?.id]);
+  const { activeAccount } = useAccount();
+  // The logout after 5 min in the background and a refused session keep the account in memory.
+  const { isAuthenticated } = useAuth();
+  const [feed] = useState(() =>
+    createMovementFeed({
+      loadPage: (accountId, offset) => ProductService.getMovementsPage(accountId, offset),
+      pageSize: MOVEMENT_PAGE_SIZE,
+      onPullFailed: () => ToastService.error("Impossible de charger les mouvements"),
+    }),
+  );
+  const state = useSyncExternalStore(feed.subscribe, feed.getState);
+  const accountId = activeAccount?.id ?? null;
 
   useEffect(() => {
-    if (activeAccount?.id && activeAccount.id !== lastAccountId) {
-      loadStats();
-    }
-  }, [activeAccount?.id, lastAccountId, loadStats]);
+    feed.setSession({ accountId, connected: isAuthenticated });
+  }, [feed, accountId, isAuthenticated]);
 
-  return (
-    <StatsContext.Provider
-      value={{
-        stats,
-        isLoading,
-        error,
-        refresh: loadStats,
-      }}
-    >
-      {children}
-    </StatsContext.Provider>
+  const value = useMemo(
+    () => ({
+      ...state,
+      pull: feed.pull,
+      loadNextPage: feed.loadNextPage,
+      retry: feed.retry,
+      afterWrite: feed.afterWrite,
+    }),
+    [feed, state],
   );
+
+  return <StatsContext.Provider value={value}>{children}</StatsContext.Provider>;
 }
 
 export function useStatsContext() {
